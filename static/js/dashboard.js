@@ -35,6 +35,9 @@ function initializeDashboard() {
     if (document.getElementById('indexingChart')) {
         initializeIndexingChart();
     }
+    
+    // Initialize search functionality
+    setupSearchFilters();
 }
 
 /**
@@ -49,10 +52,40 @@ function setupEventListeners() {
     }
     
     // Harvest GSC button (check if exists first)
-    const harvestBtn = document.querySelector('[onclick="harvestGSCFeedback()"]');
+    const harvestBtn = document.querySelector('[onclick="harvestGSCFeedback()"]') || document.getElementById('harvestGSCBtn');
     if (harvestBtn) {
         harvestBtn.removeAttribute('onclick');
         harvestBtn.addEventListener('click', harvestGSCFeedback);
+    }
+    
+    // Advanced indexing button
+    const advancedIndexingBtn = document.getElementById('startAdvancedIndexingBtn');
+    if (advancedIndexingBtn) {
+        advancedIndexingBtn.addEventListener('click', startAdvancedIndexing);
+    }
+    
+    // Process tasks button
+    const processTasksBtnNew = document.getElementById('processTasksBtn');
+    if (processTasksBtnNew) {
+        processTasksBtnNew.addEventListener('click', processBackgroundTasks);
+    }
+    
+    // AI Agent button
+    const aiAgentBtn = document.getElementById('openAIAgentBtn');
+    if (aiAgentBtn) {
+        aiAgentBtn.addEventListener('click', openAIAgent);
+    }
+    
+    // Backlink dashboard button
+    const backlinkBtn = document.getElementById('openBacklinkDashboardBtn');
+    if (backlinkBtn) {
+        backlinkBtn.addEventListener('click', openBacklinkDashboard);
+    }
+    
+    // ML prediction test button
+    const mlPredictionBtn = document.getElementById('testMLPredictionBtn');
+    if (mlPredictionBtn) {
+        mlPredictionBtn.addEventListener('click', testMLPrediction);
     }
     
     // Form submissions
@@ -97,6 +130,49 @@ function setupUrlCheckboxes() {
             updateBulkActions();
         });
     });
+}
+
+/**
+ * Update select all checkbox state based on individual checkbox states
+ */
+function updateSelectAllState() {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const urlCheckboxes = document.querySelectorAll('.url-checkbox');
+    
+    if (!selectAllCheckbox || urlCheckboxes.length === 0) return;
+    
+    const checkedCount = document.querySelectorAll('.url-checkbox:checked').length;
+    
+    if (checkedCount === 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+    } else if (checkedCount === urlCheckboxes.length) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+    } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+    }
+}
+
+/**
+ * Update bulk actions visibility and functionality
+ */
+function updateBulkActions() {
+    const checkedBoxes = document.querySelectorAll('.url-checkbox:checked');
+    const bulkActionsContainer = document.getElementById('bulkActions');
+    const selectedCountElement = document.getElementById('selectedCount');
+    
+    if (bulkActionsContainer) {
+        if (checkedBoxes.length > 0) {
+            bulkActionsContainer.classList.remove('d-none');
+            if (selectedCountElement) {
+                selectedCountElement.textContent = checkedBoxes.length;
+            }
+        } else {
+            bulkActionsContainer.classList.add('d-none');
+        }
+    }
 }
 
 /**
@@ -587,8 +663,193 @@ async function startAdvancedIndexing() {
     }
 }
 
+/**
+ * Open AI Agent interface
+ */
+function openAIAgent() {
+    // Navigate to AI agent page or open in modal
+    window.location.href = '/ai-agent';
+}
+
+/**
+ * Open Backlink Dashboard
+ */
+function openBacklinkDashboard() {
+    // Navigate to backlink dashboard
+    window.location.href = '/backlink';
+}
+
+/**
+ * Test ML Prediction functionality
+ */
+async function testMLPrediction() {
+    const button = event.target.closest('button');
+    const originalText = button.innerHTML;
+    
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Testing ML...';
+    button.disabled = true;
+    
+    try {
+        const response = await fetch('/api/ml-prediction-test', { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to test ML prediction');
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast(`ML Prediction Test: ${data.prediction}% success rate predicted`, 'success');
+        } else {
+            showToast(data.error || 'Error testing ML prediction', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error testing ML prediction:', error);
+        showToast('Error testing ML prediction', 'error');
+    } finally {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+/**
+ * Handle bulk URL operations
+ */
+async function bulkAction(action) {
+    const checkedBoxes = document.querySelectorAll('.url-checkbox:checked');
+    if (checkedBoxes.length === 0) {
+        showToast('Please select URLs first', 'warning');
+        return;
+    }
+    
+    const urlIds = Array.from(checkedBoxes).map(cb => cb.value);
+    
+    try {
+        const response = await fetch('/api/bulk-action', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: action,
+                url_ids: urlIds
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to perform bulk action');
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast(`${action} applied to ${urlIds.length} URLs`, 'success');
+            setTimeout(loadDashboardStats, 1000);
+        } else {
+            showToast(data.error || 'Error performing bulk action', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error performing bulk action:', error);
+        showToast('Error performing bulk action', 'error');
+    }
+}
+
+/**
+ * Real-time search functionality
+ */
+function setupSearchFilters() {
+    const searchInput = document.getElementById('searchUrls');
+    const statusFilter = document.getElementById('statusFilter');
+    
+    if (searchInput) {
+        const debouncedSearch = debounce(performSearch, 300);
+        searchInput.addEventListener('input', debouncedSearch);
+    }
+    
+    if (statusFilter) {
+        statusFilter.addEventListener('change', performSearch);
+    }
+}
+
+/**
+ * Perform search with current filters
+ */
+async function performSearch() {
+    const searchInput = document.getElementById('searchUrls');
+    const statusFilter = document.getElementById('statusFilter');
+    const resultsContainer = document.getElementById('searchResults');
+    
+    if (!searchInput || !resultsContainer) return;
+    
+    const query = searchInput.value.trim();
+    const status = statusFilter ? statusFilter.value : '';
+    
+    try {
+        const params = new URLSearchParams();
+        if (query) params.append('q', query);
+        if (status) params.append('status', status);
+        
+        const response = await fetch(`/api/search-urls?${params}`);
+        if (!response.ok) throw new Error('Search failed');
+        
+        const data = await response.json();
+        updateSearchResults(data.urls);
+        
+    } catch (error) {
+        console.error('Search error:', error);
+        showToast('Search failed', 'error');
+    }
+}
+
+/**
+ * Update search results display
+ */
+function updateSearchResults(urls) {
+    const resultsContainer = document.getElementById('searchResults');
+    if (!resultsContainer) return;
+    
+    if (urls.length === 0) {
+        resultsContainer.innerHTML = '<p class="text-muted">No results found</p>';
+        return;
+    }
+    
+    const resultsHTML = urls.map(url => `
+        <div class="list-group-item">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-1">${url.url}</h6>
+                    <small class="text-muted">Status: ${url.status}</small>
+                </div>
+                <span class="badge bg-${getStatusBadgeClass(url.status)}">${url.status}</span>
+            </div>
+        </div>
+    `).join('');
+    
+    resultsContainer.innerHTML = resultsHTML;
+}
+
+/**
+ * Get Bootstrap badge class for status
+ */
+function getStatusBadgeClass(status) {
+    const statusMap = {
+        'indexed': 'success',
+        'ready': 'info',
+        'pending': 'warning',
+        'error': 'danger'
+    };
+    return statusMap[status] || 'secondary';
+}
+
 // Export functions for global access
 window.processBackgroundTasks = processBackgroundTasks;
 window.harvestGSCFeedback = harvestGSCFeedback;
 window.startAdvancedIndexing = startAdvancedIndexing;
+window.openAIAgent = openAIAgent;
+window.openBacklinkDashboard = openBacklinkDashboard;
+window.testMLPrediction = testMLPrediction;
+window.bulkAction = bulkAction;
 window.showToast = showToast;
