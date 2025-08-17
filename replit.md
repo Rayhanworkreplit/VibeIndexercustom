@@ -60,10 +60,12 @@ Preferred communication style: Simple, everyday language.
 
 ### Development & Deployment
 - **Flask development server** with debug mode for local development
+- **Gunicorn WSGI server** configured for production deployment on Replit
 - **ProxyFix middleware** for handling reverse proxy deployments
 - **Environment variable configuration** for deployment flexibility
-- **PostgreSQL database** with connection pooling and health checks enabled
+- **SQLite database** as primary database (configurable to PostgreSQL via DATABASE_URL)
 - **aiohttp async processing** for concurrent advanced indexing operations
+- **Replit environment compatibility** with proper port binding (0.0.0.0:5000)
 
 ### API Dependencies
 - **Google Search Console API scopes**: webmasters scope for property management
