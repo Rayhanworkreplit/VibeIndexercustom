@@ -32,6 +32,7 @@ with app.app_context():
     # Import models to ensure tables are created
     import models
     import routes
+    # Routes are imported in routes.py
     
     # Register backlink indexer blueprint
     from backlink_routes import backlink_bp

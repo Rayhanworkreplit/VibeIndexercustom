@@ -243,39 +243,88 @@ def url_detail(url_id):
 
 @app.route('/settings')
 def settings():
-    """Settings page"""
-    settings = Settings.query.first()
-    if not settings:
-        settings = Settings()
-        settings.site_url = "https://example.com"
-        settings.gsc_property_url = "https://example.com"
-        db.session.add(settings)
+    """Settings configuration page"""
+    # Get or create default settings
+    settings_obj = Settings.query.first()
+    if not settings_obj:
+        settings_obj = Settings()
+        settings_obj.site_url = "https://example.com"
+        settings_obj.gsc_property_url = "https://example.com"
+        settings_obj.max_crawl_rate = 50
+        settings_obj.sitemap_max_urls = 50000
+        settings_obj.crawl_delay = 2.0
+        settings_obj.auto_submit_sitemaps = True
+        settings_obj.alert_on_deindex = True
+        db.session.add(settings_obj)
         db.session.commit()
     
-    return render_template('settings.html', settings=settings)
+    return render_template('settings.html', settings=settings_obj)
 
-@app.route('/update-settings', methods=['POST'])
+@app.route('/settings', methods=['POST'])
 def update_settings():
     """Update application settings"""
-    settings = Settings.query.first()
-    if not settings:
-        settings = Settings()
-        db.session.add(settings)
+    settings_obj = Settings.query.first()
+    if not settings_obj:
+        settings_obj = Settings()
+        db.session.add(settings_obj)
     
-    # Update settings from form
-    settings.site_url = request.form.get('site_url', '').strip()
-    settings.gsc_property_url = request.form.get('gsc_property_url', '').strip()
-    settings.max_crawl_rate = int(request.form.get('max_crawl_rate', 50))
-    settings.crawl_delay = float(request.form.get('crawl_delay', 1.0))
-    settings.sitemap_max_urls = int(request.form.get('sitemap_max_urls', 50000))
-    settings.auto_submit_sitemaps = request.form.get('auto_submit_sitemaps') == 'on'
-    settings.slack_webhook_url = request.form.get('slack_webhook_url', '').strip()
-    settings.email_alerts = request.form.get('email_alerts', '').strip()
-    settings.alert_on_deindex = request.form.get('alert_on_deindex') == 'on'
+    try:
+        # Update settings from form data
+        settings_obj.site_url = request.form.get('site_url', '').strip()
+        settings_obj.gsc_property_url = request.form.get('gsc_property_url', '').strip()
+        settings_obj.max_crawl_rate = int(request.form.get('max_crawl_rate', 50))
+        settings_obj.crawl_delay = float(request.form.get('crawl_delay', 2.0))
+        settings_obj.sitemap_max_urls = int(request.form.get('sitemap_max_urls', 50000))
+        settings_obj.auto_submit_sitemaps = bool(request.form.get('auto_submit_sitemaps'))
+        settings_obj.alert_on_deindex = bool(request.form.get('alert_on_deindex'))
+        settings_obj.slack_webhook_url = request.form.get('slack_webhook_url', '').strip() or None
+        settings_obj.email_alerts = request.form.get('email_alerts', '').strip() or None
+        
+        db.session.commit()
+        flash('Settings updated successfully!', 'success')
+        
+    except (ValueError, TypeError) as e:
+        flash(f'Error updating settings: {str(e)}', 'error')
+        db.session.rollback()
     
-    db.session.commit()
-    flash('Settings updated successfully', 'success')
     return redirect(url_for('settings'))
+
+@app.route('/api/gsc-status')
+def gsc_status():
+    """Check Google Search Console integration status"""
+    try:
+        import os
+        import json
+        
+        # Check if GSC credentials are available
+        gsc_creds_file = os.environ.get('GSC_SERVICE_ACCOUNT_FILE')
+        gsc_creds_json = os.environ.get('GSC_SERVICE_ACCOUNT_JSON')
+        
+        credentials_available = bool(gsc_creds_file or gsc_creds_json)
+        
+        # Try to parse JSON if provided
+        valid_json = False
+        if gsc_creds_json:
+            try:
+                json.loads(gsc_creds_json)
+                valid_json = True
+            except json.JSONDecodeError:
+                pass
+        
+        return jsonify({
+            'credentials_available': credentials_available,
+            'credentials_file': bool(gsc_creds_file),
+            'credentials_json': bool(gsc_creds_json),
+            'valid_json': valid_json,
+            'status': 'configured' if credentials_available else 'not_configured'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'credentials_available': False,
+            'status': 'error'
+        }), 500
 
 @app.route('/api/stats')
 def api_stats():

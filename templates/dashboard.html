@@ -326,10 +326,10 @@
         
         {% if stats %}
             statsData = {
-                indexed_urls: {{ stats.indexed_urls }},
-                ready_urls: {{ stats.ready_urls }},
-                pending_urls: {{ stats.pending_urls }},
-                error_urls: {{ stats.error_urls }}
+                indexed_urls: {{ stats.indexed_urls or 0 }},
+                ready_urls: {{ stats.ready_urls or 0 }},
+                pending_urls: {{ stats.pending_urls or 0 }},
+                error_urls: {{ stats.error_urls or 0 }}
             };
         {% endif %}
         
