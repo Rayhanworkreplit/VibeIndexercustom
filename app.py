@@ -43,11 +43,25 @@ with app.app_context():
     
     # Initialize default settings if not exists
     from models import Settings
+    import json
+    
     if not Settings.query.first():
         default_settings = Settings()
         default_settings.site_url = "https://example.com"
         default_settings.gsc_property_url = "https://example.com"
         default_settings.max_crawl_rate = 50
         default_settings.sitemap_max_urls = 50000
+        default_settings.crawl_delay = 2.0
+        default_settings.auto_submit_sitemaps = True
+        default_settings.alert_on_deindex = True
+        # Set default advanced settings
+        default_advanced = {
+            'indexing_strategy': 'balanced',
+            'enable_backlink_indexing': True,
+            'retry_failed_urls': 'auto',
+            'detailed_logging': False
+        }
+        default_settings.advanced_settings = json.dumps(default_advanced)
         db.session.add(default_settings)
         db.session.commit()
+        print("Created default settings with advanced options")

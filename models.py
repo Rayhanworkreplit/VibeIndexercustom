@@ -171,9 +171,37 @@ class Settings(db.Model):
     email_alerts = db.Column(db.String(255))
     alert_on_deindex = db.Column(db.Boolean, default=True)
     
+    # Advanced settings (stored as JSON)
+    advanced_settings = db.Column(db.Text)  # JSON field for extensible settings
+    
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def get_advanced_setting(self, key, default=None):
+        """Get a specific advanced setting"""
+        if not self.advanced_settings:
+            return default
+        try:
+            import json
+            settings = json.loads(self.advanced_settings)
+            return settings.get(key, default)
+        except (json.JSONDecodeError, AttributeError):
+            return default
+    
+    def set_advanced_setting(self, key, value):
+        """Set a specific advanced setting"""
+        try:
+            import json
+            if self.advanced_settings:
+                settings = json.loads(self.advanced_settings)
+            else:
+                settings = {}
+            settings[key] = value
+            self.advanced_settings = json.dumps(settings)
+        except json.JSONDecodeError:
+            settings = {key: value}
+            self.advanced_settings = json.dumps(settings)
     
     def __repr__(self):
         return f'<Settings {self.site_url}>'

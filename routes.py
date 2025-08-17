@@ -255,6 +255,14 @@ def settings():
         settings_obj.crawl_delay = 2.0
         settings_obj.auto_submit_sitemaps = True
         settings_obj.alert_on_deindex = True
+        # Set default advanced settings
+        default_advanced = {
+            'indexing_strategy': 'balanced',
+            'enable_backlink_indexing': True,
+            'retry_failed_urls': 'auto',
+            'detailed_logging': False
+        }
+        settings_obj.advanced_settings = json.dumps(default_advanced)
         db.session.add(settings_obj)
         db.session.commit()
     
@@ -279,6 +287,21 @@ def update_settings():
         settings_obj.alert_on_deindex = bool(request.form.get('alert_on_deindex'))
         settings_obj.slack_webhook_url = request.form.get('slack_webhook_url', '').strip() or None
         settings_obj.email_alerts = request.form.get('email_alerts', '').strip() or None
+        
+        # Handle advanced settings
+        indexing_strategy = request.form.get('indexing_strategy', 'balanced')
+        enable_backlink_indexing = bool(request.form.get('enable_backlink_indexing'))
+        retry_failed_urls = request.form.get('retry_failed_urls', 'auto')
+        detailed_logging = bool(request.form.get('detailed_logging'))
+        
+        # Store advanced settings as JSON
+        advanced_settings = {
+            'indexing_strategy': indexing_strategy,
+            'enable_backlink_indexing': enable_backlink_indexing,
+            'retry_failed_urls': retry_failed_urls,
+            'detailed_logging': detailed_logging
+        }
+        settings_obj.advanced_settings = json.dumps(advanced_settings)
         
         db.session.commit()
         flash('Settings updated successfully!', 'success')
@@ -323,6 +346,108 @@ def gsc_status():
         return jsonify({
             'error': str(e),
             'credentials_available': False,
+            'status': 'error'
+        }), 500
+
+@app.route('/api/test-config')
+def test_config():
+    """Test current configuration"""
+    try:
+        settings_obj = Settings.query.first()
+        if not settings_obj:
+            return jsonify({
+                'error': 'No settings found',
+                'status': 'error'
+            }), 400
+        
+        results = {
+            'site_url_valid': False,
+            'gsc_url_valid': False,
+            'crawl_settings_valid': False,
+            'sitemap_settings_valid': False
+        }
+        
+        # Validate site URL
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(settings_obj.site_url)
+            results['site_url_valid'] = bool(parsed.scheme and parsed.netloc)
+        except:
+            pass
+        
+        # Validate GSC URL
+        try:
+            parsed = urlparse(settings_obj.gsc_property_url)
+            results['gsc_url_valid'] = bool(parsed.scheme and parsed.netloc)
+        except:
+            pass
+        
+        # Validate crawl settings
+        results['crawl_settings_valid'] = (
+            settings_obj.max_crawl_rate > 0 and 
+            settings_obj.crawl_delay >= 0
+        )
+        
+        # Validate sitemap settings
+        results['sitemap_settings_valid'] = (
+            settings_obj.sitemap_max_urls > 0 and 
+            settings_obj.sitemap_max_urls <= 50000
+        )
+        
+        all_valid = all(results.values())
+        
+        return jsonify({
+            'results': results,
+            'all_valid': all_valid,
+            'status': 'valid' if all_valid else 'invalid'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'status': 'error'
+        }), 500
+
+@app.route('/api/system-status')
+def system_status():
+    """Get system status information"""
+    try:
+        import os
+        
+        # Database stats
+        total_urls = URL.query.count()
+        total_crawls = CrawlResult.query.count()
+        total_sitemaps = Sitemap.query.count()
+        
+        # Check database connection
+        db_healthy = True
+        try:
+            db.session.execute('SELECT 1')
+        except:
+            db_healthy = False
+        
+        # Environment variables check
+        env_vars = {
+            'DATABASE_URL': bool(os.environ.get('DATABASE_URL')),
+            'SESSION_SECRET': bool(os.environ.get('SESSION_SECRET')),
+            'GSC_SERVICE_ACCOUNT_JSON': bool(os.environ.get('GSC_SERVICE_ACCOUNT_JSON')),
+            'GSC_SERVICE_ACCOUNT_FILE': bool(os.environ.get('GSC_SERVICE_ACCOUNT_FILE'))
+        }
+        
+        return jsonify({
+            'database': {
+                'healthy': db_healthy,
+                'total_urls': total_urls,
+                'total_crawls': total_crawls,
+                'total_sitemaps': total_sitemaps
+            },
+            'environment': env_vars,
+            'status': 'healthy' if db_healthy else 'unhealthy'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
             'status': 'error'
         }), 500
 

@@ -234,6 +234,98 @@
         </div>
     </div>
     
+    <!-- Advanced Settings -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-cogs me-2"></i>Advanced Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="indexing_strategy" class="form-label">Indexing Strategy</label>
+                                <select class="form-select" id="indexing_strategy" name="indexing_strategy">
+                                    <option value="aggressive" {% if settings.get_advanced_setting('indexing_strategy') == 'aggressive' %}selected{% endif %}>Aggressive (6-Layer System)</option>
+                                    <option value="balanced" {% if settings.get_advanced_setting('indexing_strategy') == 'balanced' or not settings.get_advanced_setting('indexing_strategy') %}selected{% endif %}>Balanced (Core Strategies)</option>
+                                    <option value="conservative" {% if settings.get_advanced_setting('indexing_strategy') == 'conservative' %}selected{% endif %}>Conservative (Basic Only)</option>
+                                </select>
+                                <div class="form-text">Choose indexing approach based on your site's needs</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="enable_backlink_indexing" 
+                                           name="enable_backlink_indexing" {% if settings.get_advanced_setting('enable_backlink_indexing', True) %}checked{% endif %}>
+                                    <label class="form-check-label" for="enable_backlink_indexing">
+                                        Enable Advanced Backlink Indexing
+                                    </label>
+                                </div>
+                                <div class="form-text">Use our 6-method backlink indexing system for faster results</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="retry_failed_urls" class="form-label">Retry Failed URLs</label>
+                                <select class="form-select" id="retry_failed_urls" name="retry_failed_urls">
+                                    <option value="auto" {% if settings.get_advanced_setting('retry_failed_urls') == 'auto' or not settings.get_advanced_setting('retry_failed_urls') %}selected{% endif %}>Automatic (Recommended)</option>
+                                    <option value="manual" {% if settings.get_advanced_setting('retry_failed_urls') == 'manual' %}selected{% endif %}>Manual Only</option>
+                                    <option value="disabled" {% if settings.get_advanced_setting('retry_failed_urls') == 'disabled' %}selected{% endif %}>Disabled</option>
+                                </select>
+                                <div class="form-text">How to handle URLs that fail initial indexing</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="detailed_logging" 
+                                           name="detailed_logging" {% if settings.get_advanced_setting('detailed_logging') %}checked{% endif %}>
+                                    <label class="form-check-label" for="detailed_logging">
+                                        Enable Detailed Logging
+                                    </label>
+                                </div>
+                                <div class="form-text">Log detailed information for debugging (may impact performance)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Setup Guide -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-book me-2"></i>Quick Setup Guide</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Getting Started</h6>
+                            <ol class="list-unstyled">
+                                <li><i class="fas fa-check-circle text-success me-2"></i>1. Set your site URL above</li>
+                                <li><i class="fas fa-check-circle text-success me-2"></i>2. Configure crawling preferences</li>
+                                <li><i class="fas fa-clock text-warning me-2"></i>3. Set up Google Search Console (optional)</li>
+                                <li><i class="fas fa-clock text-warning me-2"></i>4. Add URLs or sitemaps to begin indexing</li>
+                            </ol>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>For Google Search Console Integration</h6>
+                            <ol class="list-unstyled">
+                                <li><i class="fas fa-external-link-alt me-2"></i>Create a <a href="https://console.cloud.google.com" target="_blank">Google Cloud Project</a></li>
+                                <li><i class="fas fa-external-link-alt me-2"></i>Enable the <a href="https://console.cloud.google.com/apis/library/searchconsole.googleapis.com" target="_blank">Search Console API</a></li>
+                                <li><i class="fas fa-external-link-alt me-2"></i>Create a Service Account and download JSON</li>
+                                <li><i class="fas fa-external-link-alt me-2"></i>Add service account email to your <a href="https://search.google.com/search-console" target="_blank">GSC property</a></li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Submit Button -->
     <div class="row">
         <div class="col-12">
@@ -279,11 +371,54 @@
         }
     }
     
+    // Test configuration
+    async function testConfiguration() {
+        const testBtn = document.getElementById('testConfigBtn');
+        const originalText = testBtn.innerHTML;
+        
+        testBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+        testBtn.disabled = true;
+        
+        try {
+            const response = await fetch('/api/test-config');
+            const data = await response.json();
+            
+            if (data.all_valid) {
+                showToast('Configuration test passed! All settings are valid.', 'success');
+            } else {
+                let errorMsg = 'Configuration issues found: ';
+                const issues = [];
+                if (!data.results.site_url_valid) issues.push('Invalid site URL');
+                if (!data.results.gsc_url_valid) issues.push('Invalid GSC URL');
+                if (!data.results.crawl_settings_valid) issues.push('Invalid crawl settings');
+                if (!data.results.sitemap_settings_valid) issues.push('Invalid sitemap settings');
+                
+                showToast(errorMsg + issues.join(', '), 'error');
+            }
+        } catch (error) {
+            showToast('Failed to test configuration: ' + error.message, 'error');
+        } finally {
+            testBtn.innerHTML = originalText;
+            testBtn.disabled = false;
+        }
+    }
+    
     // Check status when page loads
     document.addEventListener('DOMContentLoaded', function() {
-        // For now, assume GSC is not configured since we don't have the API endpoint
-        document.getElementById('gsc-status').innerHTML = '<span class="badge bg-warning">Check Environment Variables</span>';
-        document.getElementById('gsc-env-status').innerHTML = '<span class="badge bg-warning">Not Checked</span>';
+        checkGSCStatus();
+        
+        // Add test configuration button if it doesn't exist
+        const submitRow = document.querySelector('.d-flex.justify-content-end');
+        if (submitRow && !document.getElementById('testConfigBtn')) {
+            const testBtn = document.createElement('button');
+            testBtn.type = 'button';
+            testBtn.id = 'testConfigBtn';
+            testBtn.className = 'btn btn-outline-info me-2';
+            testBtn.innerHTML = '<i class="fas fa-flask me-1"></i> Test Config';
+            testBtn.onclick = testConfiguration;
+            
+            submitRow.insertBefore(testBtn, submitRow.firstChild);
+        }
     });
     
     // Form validation
