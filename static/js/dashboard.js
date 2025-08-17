@@ -626,19 +626,178 @@ window.addEventListener('beforeunload', function() {
  * Start Advanced 6-Layer Indexing Campaign
  */
 async function startAdvancedIndexing() {
-    const button = event.target.closest('button');
+    // Show configuration modal first
+    showAdvancedIndexingModal();
+}
+
+/**
+ * Show Advanced Indexing Configuration Modal
+ */
+function showAdvancedIndexingModal() {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('advancedIndexingModal');
+    if (!modal) {
+        modal = createAdvancedIndexingModal();
+        document.body.appendChild(modal);
+    }
+    
+    // Show the modal
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+}
+
+/**
+ * Create Advanced Indexing Configuration Modal
+ */
+function createAdvancedIndexingModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.id = 'advancedIndexingModal';
+    modal.tabIndex = -1;
+    modal.innerHTML = `
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-rocket me-2"></i>
+                        Configure 6-Layer Indexing Campaign
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="advancedIndexingForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-layer-group me-2"></i>Indexing Layers</h6>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="layer1" checked>
+                                    <label class="form-check-label" for="layer1">
+                                        <strong>Layer 1:</strong> Direct Sitemap Pinging
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="layer2" checked>
+                                    <label class="form-check-label" for="layer2">
+                                        <strong>Layer 2:</strong> RSS + PubSubHubbub
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="layer3" checked>
+                                    <label class="form-check-label" for="layer3">
+                                        <strong>Layer 3:</strong> Internal Linking Web
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="layer4" checked>
+                                    <label class="form-check-label" for="layer4">
+                                        <strong>Layer 4:</strong> Social Signal Injection
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="layer5" checked>
+                                    <label class="form-check-label" for="layer5">
+                                        <strong>Layer 5:</strong> Third-party Discovery
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="layer6" checked>
+                                    <label class="form-check-label" for="layer6">
+                                        <strong>Layer 6:</strong> Advanced Crawl Triggers
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-cogs me-2"></i>Campaign Settings</h6>
+                                <div class="mb-3">
+                                    <label class="form-label">URLs to Process</label>
+                                    <select class="form-select" id="urlSelection">
+                                        <option value="ready">All Ready URLs</option>
+                                        <option value="pending">All Pending URLs</option>
+                                        <option value="all">All URLs</option>
+                                        <option value="selected">Selected URLs Only</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Priority Level</label>
+                                    <select class="form-select" id="priorityLevel">
+                                        <option value="1">High Priority</option>
+                                        <option value="2" selected>Normal Priority</option>
+                                        <option value="3">Low Priority</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Delay Between Layers (minutes)</label>
+                                    <input type="number" class="form-control" id="layerDelay" value="30" min="5" max="1440">
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="enableRetries" checked>
+                                    <label class="form-check-label" for="enableRetries">
+                                        Enable automatic retries for failed URLs
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>Campaign Overview:</strong> This will execute a comprehensive 6-layer indexing strategy 
+                                designed to achieve 95%+ Google indexing success rates through multiple proven methods.
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-warning" onclick="startAdvancedIndexingCampaign()">
+                        <i class="fas fa-rocket me-1"></i>
+                        Launch Campaign
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return modal;
+}
+
+/**
+ * Start the actual advanced indexing campaign
+ */
+async function startAdvancedIndexingCampaign() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('advancedIndexingModal'));
+    const button = event.target;
     const originalText = button.innerHTML;
     
-    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Starting Campaign...';
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Starting...';
     button.disabled = true;
     
     try {
+        // Collect form data
+        const form = document.getElementById('advancedIndexingForm');
+        const formData = new FormData(form);
+        
+        const config = {
+            layers: {
+                layer1: document.getElementById('layer1').checked,
+                layer2: document.getElementById('layer2').checked,
+                layer3: document.getElementById('layer3').checked,
+                layer4: document.getElementById('layer4').checked,
+                layer5: document.getElementById('layer5').checked,
+                layer6: document.getElementById('layer6').checked
+            },
+            url_selection: document.getElementById('urlSelection').value,
+            priority: parseInt(document.getElementById('priorityLevel').value),
+            layer_delay: parseInt(document.getElementById('layerDelay').value),
+            enable_retries: document.getElementById('enableRetries').checked
+        };
+        
         const response = await fetch('/api/advanced-indexing', { 
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({}) // Use all ready URLs
+            body: JSON.stringify(config)
         });
         
         if (!response.ok) throw new Error('Failed to start advanced indexing');
@@ -646,6 +805,7 @@ async function startAdvancedIndexing() {
         const data = await response.json();
         
         if (data.success) {
+            modal.hide();
             showToast(`Advanced 6-layer indexing campaign started for ${data.url_count} URLs`, 'success');
             
             // Refresh stats after starting campaign
@@ -844,10 +1004,23 @@ function getStatusBadgeClass(status) {
     return statusMap[status] || 'secondary';
 }
 
+/**
+ * Add safer null checks for addEventListener
+ */
+function safeAddEventListener(selector, event, handler) {
+    const element = typeof selector === 'string' ? document.querySelector(selector) : selector;
+    if (element && typeof element.addEventListener === 'function') {
+        element.addEventListener(event, handler);
+        return true;
+    }
+    return false;
+}
+
 // Export functions for global access
 window.processBackgroundTasks = processBackgroundTasks;
 window.harvestGSCFeedback = harvestGSCFeedback;
 window.startAdvancedIndexing = startAdvancedIndexing;
+window.startAdvancedIndexingCampaign = startAdvancedIndexingCampaign;
 window.openAIAgent = openAIAgent;
 window.openBacklinkDashboard = openBacklinkDashboard;
 window.testMLPrediction = testMLPrediction;

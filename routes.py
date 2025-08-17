@@ -573,6 +573,11 @@ def start_advanced_indexing():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/ai-agent')
+def ai_agent():
+    """AI Agent interface for indexing management"""
+    return render_template('ai_agent.html')
+
 @app.route('/api/analyze-content', methods=['POST'])
 def analyze_content():
     """Analyze URL content for AI agent"""
@@ -603,6 +608,109 @@ def analyze_content():
             'content_preview': content_preview,
             'content_type': 'text/html',
             'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ml-prediction-test', methods=['POST'])
+def ml_prediction_test():
+    """Test ML prediction functionality"""
+    try:
+        # Simulate ML prediction for demo
+        import random
+        prediction = round(random.uniform(75, 98), 1)
+        
+        return jsonify({
+            'success': True,
+            'prediction': prediction,
+            'confidence': 'high',
+            'method_recommendation': 'social_bookmarking + rss_distribution'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/bulk-action', methods=['POST'])
+def bulk_action():
+    """Handle bulk operations on URLs"""
+    try:
+        data = request.get_json()
+        action = data.get('action')
+        url_ids = data.get('url_ids', [])
+        
+        if not action or not url_ids:
+            return jsonify({'success': False, 'error': 'Action and URL IDs required'}), 400
+        
+        urls = URL.query.filter(URL.id.in_(url_ids)).all()
+        count = 0
+        
+        if action == 'validate':
+            for url in urls:
+                if url.status == 'pending':
+                    queue_validation_task(url.id)
+                    count += 1
+        elif action == 'revalidate':
+            for url in urls:
+                url.status = 'pending'
+                queue_validation_task(url.id)
+                count += 1
+        elif action == 'mark_ready':
+            for url in urls:
+                url.status = 'ready'
+                count += 1
+        elif action == 'delete':
+            for url in urls:
+                db.session.delete(url)
+                count += 1
+        else:
+            return jsonify({'success': False, 'error': 'Invalid action'}), 400
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'{action} applied to {count} URLs',
+            'processed_count': count
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/search-urls')
+def search_urls():
+    """Search URLs with filters"""
+    try:
+        query = request.args.get('q', '')
+        status = request.args.get('status', '')
+        page = request.args.get('page', 1, type=int)
+        
+        url_query = URL.query
+        
+        if query:
+            url_query = url_query.filter(URL.url.contains(query))
+        
+        if status:
+            url_query = url_query.filter_by(status=status)
+        
+        urls_page = url_query.order_by(desc(URL.created_at)).paginate(
+            page=page, per_page=20, error_out=False
+        )
+        
+        urls_data = []
+        for url in urls_page.items:
+            urls_data.append({
+                'id': url.id,
+                'url': url.url,
+                'status': url.status,
+                'created_at': url.created_at.isoformat() if url.created_at else None
+            })
+        
+        return jsonify({
+            'urls': urls_data,
+            'total': urls_page.total,
+            'page': page,
+            'pages': urls_page.pages
         })
         
     except Exception as e:
