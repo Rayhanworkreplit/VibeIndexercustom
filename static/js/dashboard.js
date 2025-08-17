@@ -41,14 +41,14 @@ function initializeDashboard() {
  * Setup event listeners
  */
 function setupEventListeners() {
-    // Process tasks button
+    // Process tasks button (check if exists first)
     const processTasksBtn = document.querySelector('[onclick="processBackgroundTasks()"]');
     if (processTasksBtn) {
         processTasksBtn.removeAttribute('onclick');
         processTasksBtn.addEventListener('click', processBackgroundTasks);
     }
     
-    // Harvest GSC button
+    // Harvest GSC button (check if exists first)
     const harvestBtn = document.querySelector('[onclick="harvestGSCFeedback()"]');
     if (harvestBtn) {
         harvestBtn.removeAttribute('onclick');
@@ -546,7 +546,49 @@ window.addEventListener('beforeunload', function() {
     stopAutoRefresh();
 });
 
+/**
+ * Start Advanced 6-Layer Indexing Campaign
+ */
+async function startAdvancedIndexing() {
+    const button = event.target.closest('button');
+    const originalText = button.innerHTML;
+    
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Starting Campaign...';
+    button.disabled = true;
+    
+    try {
+        const response = await fetch('/api/advanced-indexing', { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({}) // Use all ready URLs
+        });
+        
+        if (!response.ok) throw new Error('Failed to start advanced indexing');
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast(`Advanced 6-layer indexing campaign started for ${data.url_count} URLs`, 'success');
+            
+            // Refresh stats after starting campaign
+            setTimeout(loadDashboardStats, 2000);
+        } else {
+            showToast(data.error || 'Error starting campaign', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error starting advanced indexing:', error);
+        showToast('Error starting advanced indexing campaign', 'error');
+    } finally {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
 // Export functions for global access
 window.processBackgroundTasks = processBackgroundTasks;
 window.harvestGSCFeedback = harvestGSCFeedback;
+window.startAdvancedIndexing = startAdvancedIndexing;
 window.showToast = showToast;

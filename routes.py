@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from app import app, db
 from models import URL, CrawlResult, Sitemap, GSCFeedback, TaskQueue, Settings, IndexingStats
 from services.url_discovery import discover_urls
-from services.background_tasks import queue_validation_task, queue_sitemap_task, process_pending_tasks
+from services.background_tasks import queue_validation_task, queue_sitemap_task, process_pending_tasks, queue_advanced_indexing_task
 from utils.helpers import is_valid_url, get_domain_from_url
 
 @app.route('/')
@@ -328,3 +328,34 @@ def not_found(error):
 def internal_error(error):
     db.session.rollback()
     return render_template('500.html'), 500
+
+
+@app.route('/api/advanced-indexing', methods=['POST'])
+def start_advanced_indexing():
+    """Start advanced 6-layer indexing campaign"""
+    try:
+        data = request.get_json()
+        url_ids = data.get('url_ids', [])
+        
+        if not url_ids:
+            # Use all ready URLs if none specified
+            urls = URL.query.filter_by(status='ready').all()
+            url_ids = [url.id for url in urls]
+        
+        if not url_ids:
+            return jsonify({
+                'success': False, 
+                'error': 'No URLs available for indexing'
+            }), 400
+        
+        # Queue advanced indexing campaign
+        task = queue_advanced_indexing_task(url_ids, priority=1)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Advanced indexing campaign queued for {len(url_ids)} URLs',
+            'task_id': task.id,
+            'url_count': len(url_ids)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

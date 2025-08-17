@@ -9,6 +9,7 @@ from models import TaskQueue, URL
 from services.url_validator import validate_single_url
 from services.sitemap_generator import generate_sitemaps_for_urls
 from services.gsc_client import submit_sitemap_to_gsc, harvest_gsc_feedback
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class TaskProcessor:
             'generate_sitemap': self._process_sitemap_task,
             'submit_sitemap': self._process_sitemap_submission_task,
             'harvest_gsc': self._process_gsc_harvest_task,
+            'advanced_indexing': self._process_advanced_indexing_task,
         }
     
     def process_tasks(self, limit: int = 10) -> int:
@@ -159,6 +161,32 @@ class TaskProcessor:
         except Exception as e:
             logger.error(f"Error processing GSC harvest task {task.id}: {str(e)}")
             raise
+    
+    def _process_advanced_indexing_task(self, task: TaskQueue) -> Dict:
+        """Process advanced 6-layer indexing campaign task"""
+        try:
+            payload = json.loads(task.payload) if task.payload else {}
+            url_ids = payload.get('url_ids', [])
+            
+            if not url_ids:
+                raise ValueError("Missing url_ids in task payload")
+            
+            # Import here to avoid circular imports
+            from services.advanced_indexing import execute_advanced_indexing_campaign
+            
+            # Execute the campaign (this is async, so we need to handle it)
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(execute_advanced_indexing_campaign(url_ids))
+            finally:
+                loop.close()
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error processing advanced indexing task {task.id}: {str(e)}")
+            raise
 
 # Task queue management functions
 
@@ -220,6 +248,25 @@ def queue_gsc_harvest_task(limit: int = 100, priority: int = 4) -> TaskQueue:
     db.session.commit()
     
     logger.info("Queued GSC harvest task")
+    return task
+
+
+def queue_advanced_indexing_task(url_ids: List[int], priority: int = 1) -> TaskQueue:
+    """Queue advanced 6-layer indexing campaign task"""
+    payload = json.dumps({
+        'url_ids': url_ids,
+        'campaign_type': '6_layer_strategy'
+    })
+    
+    task = TaskQueue()
+    task.task_type = 'advanced_indexing'
+    task.payload = payload
+    task.priority = priority
+    
+    db.session.add(task)
+    db.session.commit()
+    
+    logger.info(f"Queued advanced indexing campaign for {len(url_ids)} URLs")
     return task
 
 def process_pending_tasks(limit: int = 10) -> int:

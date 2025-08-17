@@ -50,14 +50,24 @@ Preferred communication style: Simple, everyday language.
 - **Bootstrap** (via CDN) for responsive UI components
 - **Font Awesome** for consistent iconography
 
+### Advanced Indexing Strategy - 6-Layer Campaign
+- **Layer 1**: Direct Sitemap Pinging to Google & Bing with priority=1.0 and daily changefreq
+- **Layer 2**: RSS + PubSubHubbub real-time indexing with official Google recommendation
+- **Layer 3**: Internal linking web optimization with HTML sitemaps and hub pages
+- **Layer 4**: Social signal injection through Reddit, Twitter, and social platforms
+- **Layer 5**: Third-party discovery networks via Web 2.0 properties and directories
+- **Layer 6**: Advanced crawl triggers with content freshness signals and robots.txt optimization
+
 ### Development & Deployment
 - **Flask development server** with debug mode for local development
 - **ProxyFix middleware** for handling reverse proxy deployments
 - **Environment variable configuration** for deployment flexibility
-- **SQLite database** with connection pooling and health checks enabled
+- **PostgreSQL database** with connection pooling and health checks enabled
+- **aiohttp async processing** for concurrent advanced indexing operations
 
 ### API Dependencies
 - **Google Search Console API scopes**: webmasters scope for property management
 - **XML parsing** for sitemap processing and generation
 - **robots.txt parsing** for crawl permission validation
 - **Content hashing** (MD5) for change detection and duplicate content identification
+- **PubSubHubbub integration** for real-time RSS feed notifications to search engines
