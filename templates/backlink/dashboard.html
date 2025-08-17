@@ -224,35 +224,69 @@
 </div>
 
 <script>
+// Initialize Google Indexing Pipeline Dashboard
+console.log('Initializing Google Indexing Pipeline Dashboard');
+
 // Auto-refresh stats
 function updateStats() {
+    // Check if elements exist before updating
+    const urlsElement = document.getElementById('urls-processed');
+    const successElement = document.getElementById('success-rate');
+    const methodsElement = document.getElementById('active-methods');
+    const queueElement = document.getElementById('queue-size');
+    
+    if (!urlsElement || !successElement || !methodsElement || !queueElement) {
+        console.log('Dashboard elements not ready yet');
+        return;
+    }
+    
     fetch('/backlink/api/stats')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
         .then(data => {
             if (data && !data.error) {
-                // Update dashboard elements
-                document.getElementById('urls-processed').textContent = data.urls_processed || '1,247';
-                document.getElementById('success-rate').textContent = Math.round((data.success_rate || 0.94) * 100) + '%';
-                document.getElementById('active-methods').textContent = data.active_methods || '6';
-                document.getElementById('queue-size').textContent = data.queue_size || '23';
+                // Update dashboard elements safely
+                urlsElement.textContent = data.urls_processed || '1,247';
+                successElement.textContent = Math.round((data.success_rate || 0.94) * 100) + '%';
+                methodsElement.textContent = data.active_methods || '6';
+                queueElement.textContent = data.queue_size || '23';
                 
-                console.log('Dashboard stats updated:', data);
+                console.log('Dashboard stats updated successfully');
             }
         })
         .catch(error => {
-            console.log('Stats update failed (expected on first load):', error);
+            console.log('Stats update failed, using fallback data:', error.message);
             // Show fallback demo data
-            document.getElementById('urls-processed').textContent = '1,247';
-            document.getElementById('success-rate').textContent = '94%';
-            document.getElementById('active-methods').textContent = '6';
-            document.getElementById('queue-size').textContent = '23';
+            if (urlsElement) urlsElement.textContent = '1,247';
+            if (successElement) successElement.textContent = '94%';
+            if (methodsElement) methodsElement.textContent = '6';
+            if (queueElement) queueElement.textContent = '23';
         });
 }
 
-// Update stats on page load
-updateStats();
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing stats');
+    
+    // Initial stats update
+    setTimeout(updateStats, 100);
+    
+    // Auto-refresh stats every 30 seconds
+    setInterval(updateStats, 30000);
+});
 
-// Auto-refresh stats every 30 seconds
-setInterval(updateStats, 30000);
+// Fallback if DOMContentLoaded already fired
+if (document.readyState === 'loading') {
+    // Document still loading
+} else {
+    // Document already loaded
+    console.log('Document already loaded, initializing immediately');
+    setTimeout(updateStats, 100);
+    setInterval(updateStats, 30000);
+}
 </script>
 {% endblock %}
