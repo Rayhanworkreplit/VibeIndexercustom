@@ -867,15 +867,23 @@ class PuterAIAgent {
 
 // Initialize the Puter AI Agent when DOM is loaded
 // Initialize AI agent immediately when script loads
-console.log('Initializing Puter.js AI Agent...');
-window.puterAI = new PuterAIAgent();
+try {
+    console.log('Initializing Puter.js AI Agent...');
+    window.puterAI = new PuterAIAgent();
+} catch (error) {
+    console.error('Failed to initialize Puter.js AI Agent:', error);
+}
 
 // Ensure proper initialization when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM ready, AI Agent initialized');
-    if (!window.puterAI.isInitialized) {
-        console.log('Reinitializing AI Agent...');
-        window.puterAI.init();
+    try {
+        if (!window.puterAI || !window.puterAI.isInitialized) {
+            console.log('Reinitializing AI Agent...');
+            window.puterAI = new PuterAIAgent();
+        }
+    } catch (error) {
+        console.error('Failed to initialize Puter.js AI Agent:', error);
     }
 });
 
