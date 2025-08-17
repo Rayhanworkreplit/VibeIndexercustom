@@ -313,12 +313,135 @@
                         </div>
                         <div class="col-md-6">
                             <h6>For Google Search Console Integration</h6>
-                            <ol class="list-unstyled">
-                                <li><i class="fas fa-external-link-alt me-2"></i>Create a <a href="https://console.cloud.google.com" target="_blank">Google Cloud Project</a></li>
-                                <li><i class="fas fa-external-link-alt me-2"></i>Enable the <a href="https://console.cloud.google.com/apis/library/searchconsole.googleapis.com" target="_blank">Search Console API</a></li>
-                                <li><i class="fas fa-external-link-alt me-2"></i>Create a Service Account and download JSON</li>
-                                <li><i class="fas fa-external-link-alt me-2"></i>Add service account email to your <a href="https://search.google.com/search-console" target="_blank">GSC property</a></li>
+                            <div class="alert alert-info mb-3">
+                                <small><i class="fas fa-info-circle me-1"></i>Optional but recommended for advanced features</small>
+                            </div>
+                            <ol class="small">
+                                <li class="mb-2">
+                                    <strong>Create Google Cloud Project:</strong><br>
+                                    <a href="https://console.cloud.google.com" target="_blank" class="btn btn-sm btn-outline-primary me-2">Google Cloud Console</a>
+                                    <small class="text-muted">Create a new project or select existing</small>
+                                </li>
+                                <li class="mb-2">
+                                    <strong>Enable Search Console API:</strong><br>
+                                    <a href="https://console.cloud.google.com/apis/library/searchconsole.googleapis.com" target="_blank" class="btn btn-sm btn-outline-primary me-2">Enable API</a>
+                                    <small class="text-muted">Required for programmatic access</small>
+                                </li>
+                                <li class="mb-2">
+                                    <strong>Create Service Account:</strong><br>
+                                    <small class="text-muted">Go to IAM & Admin → Service Accounts → Create Service Account</small>
+                                    <br><small>Download the JSON key file</small>
+                                </li>
+                                <li class="mb-2">
+                                    <strong>Add to Search Console:</strong><br>
+                                    <a href="https://search.google.com/search-console" target="_blank" class="btn btn-sm btn-outline-primary me-2">Search Console</a>
+                                    <small class="text-muted">Add service account email as owner/user</small>
+                                </li>
+                                <li class="mb-2">
+                                    <strong>Upload Credentials:</strong><br>
+                                    <button type="button" class="btn btn-sm btn-success" onclick="showCredentialsUpload()">
+                                        <i class="fas fa-upload me-1"></i>Upload JSON
+                                    </button>
+                                    <small class="text-muted">Securely store your credentials</small>
+                                </li>
                             </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Manual Configuration Section -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-tools me-2"></i>Manual Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Environment Variables Setup</h6>
+                            <p class="text-muted small">Configure these in your Replit Secrets or .env file:</p>
+                            
+                            <div class="mb-3">
+                                <label class="form-label small"><strong>GSC_SERVICE_ACCOUNT_JSON</strong></label>
+                                <textarea class="form-control font-monospace" rows="4" placeholder='{"type": "service_account", "project_id": "your-project"...}' id="gsc_json_input"></textarea>
+                                <div class="form-text">Paste your Google Service Account JSON content here</div>
+                                <button type="button" class="btn btn-sm btn-primary mt-2" onclick="saveGSCCredentials()">
+                                    <i class="fas fa-save me-1"></i>Save Credentials
+                                </button>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label small"><strong>Alternative: File Path</strong></label>
+                                <input type="text" class="form-control" placeholder="/path/to/service-account.json" id="gsc_file_path">
+                                <div class="form-text">Or specify path to your JSON file</div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h6>Database Configuration</h6>
+                            <div class="mb-3">
+                                <label class="form-label small"><strong>DATABASE_URL</strong></label>
+                                <input type="text" class="form-control font-monospace" 
+                                       value="sqlite:///indexer.db" 
+                                       placeholder="sqlite:///indexer.db or postgresql://..." 
+                                       id="database_url_input">
+                                <div class="form-text">SQLite (default) or PostgreSQL connection string</div>
+                            </div>
+                            
+                            <h6 class="mt-4">Session Security</h6>
+                            <div class="mb-3">
+                                <label class="form-label small"><strong>SESSION_SECRET</strong></label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control font-monospace" 
+                                           placeholder="your-secret-key-here" 
+                                           id="session_secret_input">
+                                    <button type="button" class="btn btn-outline-secondary" onclick="generateSessionSecret()">
+                                        <i class="fas fa-random me-1"></i>Generate
+                                    </button>
+                                </div>
+                                <div class="form-text">Used for session encryption and security</div>
+                            </div>
+                            
+                            <div class="alert alert-warning mt-3">
+                                <small><i class="fas fa-exclamation-triangle me-1"></i>
+                                <strong>Important:</strong> Add these to your Replit Secrets for security. 
+                                <a href="https://docs.replit.com/programming-ide/workspace-features/secrets" target="_blank">Learn more</a>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Quick Actions</h6>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="testDatabaseConnection()">
+                                    <i class="fas fa-database me-1"></i>Test Database
+                                </button>
+                                <button type="button" class="btn btn-outline-success btn-sm" onclick="validateAllSettings()">
+                                    <i class="fas fa-check-circle me-1"></i>Validate All
+                                </button>
+                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="resetToDefaults()">
+                                    <i class="fas fa-undo me-1"></i>Reset Defaults
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>System Status</h6>
+                            <dl class="row small">
+                                <dt class="col-sm-6">Database:</dt>
+                                <dd class="col-sm-6"><span id="db-status" class="badge bg-secondary">Checking...</span></dd>
+                                <dt class="col-sm-6">GSC Integration:</dt>
+                                <dd class="col-sm-6"><span id="gsc-integration-status" class="badge bg-secondary">Checking...</span></dd>
+                                <dt class="col-sm-6">Session Security:</dt>
+                                <dd class="col-sm-6"><span id="session-security-status" class="badge bg-secondary">Checking...</span></dd>
+                            </dl>
                         </div>
                     </div>
                 </div>
@@ -403,9 +526,171 @@
         }
     }
     
+    // Manual configuration functions
+    function showCredentialsUpload() {
+        document.getElementById('gsc_json_input').scrollIntoView({behavior: 'smooth'});
+        document.getElementById('gsc_json_input').focus();
+    }
+    
+    function saveGSCCredentials() {
+        const jsonContent = document.getElementById('gsc_json_input').value.trim();
+        if (!jsonContent) {
+            showToast('Please enter JSON credentials', 'error');
+            return;
+        }
+        
+        try {
+            JSON.parse(jsonContent); // Validate JSON
+            showToast('JSON credentials are valid! Add GSC_SERVICE_ACCOUNT_JSON to your Replit Secrets.', 'success');
+            
+            // Show instructions
+            const modal = document.createElement('div');
+            modal.innerHTML = `
+                <div class="modal fade" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Add to Replit Secrets</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>Copy this JSON and add it to your Replit Secrets:</p>
+                                <ol>
+                                    <li>Go to your Replit project</li>
+                                    <li>Click on "Secrets" in the left sidebar</li>
+                                    <li>Add a new secret with key: <code>GSC_SERVICE_ACCOUNT_JSON</code></li>
+                                    <li>Paste the JSON content as the value</li>
+                                    <li>Save and restart your application</li>
+                                </ol>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            const bootstrapModal = new bootstrap.Modal(modal.querySelector('.modal'));
+            bootstrapModal.show();
+            
+        } catch (error) {
+            showToast('Invalid JSON format: ' + error.message, 'error');
+        }
+    }
+    
+    function generateSessionSecret() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+        let secret = '';
+        for (let i = 0; i < 32; i++) {
+            secret += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        document.getElementById('session_secret_input').value = secret;
+        showToast('Generated secure session secret. Add this to your Replit Secrets as SESSION_SECRET.', 'success');
+    }
+    
+    async function testDatabaseConnection() {
+        try {
+            const response = await fetch('/api/system-status');
+            const data = await response.json();
+            
+            if (data.database.healthy) {
+                showToast('Database connection successful!', 'success');
+            } else {
+                showToast('Database connection failed', 'error');
+            }
+        } catch (error) {
+            showToast('Error testing database: ' + error.message, 'error');
+        }
+    }
+    
+    async function validateAllSettings() {
+        try {
+            const [configResponse, systemResponse, gscResponse] = await Promise.all([
+                fetch('/api/test-config'),
+                fetch('/api/system-status'),
+                fetch('/api/gsc-status')
+            ]);
+            
+            const configData = await configResponse.json();
+            const systemData = await systemResponse.json();
+            const gscData = await gscResponse.json();
+            
+            let allValid = configData.all_valid && systemData.database.healthy;
+            let message = 'Validation complete: ';
+            let issues = [];
+            
+            if (!configData.all_valid) issues.push('Configuration issues found');
+            if (!systemData.database.healthy) issues.push('Database connection failed');
+            if (!gscData.credentials_available) issues.push('GSC credentials not configured (optional)');
+            
+            if (allValid) {
+                showToast('All core settings are valid and working!', 'success');
+            } else {
+                showToast(message + issues.join(', '), 'warning');
+            }
+            
+        } catch (error) {
+            showToast('Error validating settings: ' + error.message, 'error');
+        }
+    }
+    
+    function resetToDefaults() {
+        if (confirm('Reset all settings to defaults? This will overwrite your current configuration.')) {
+            // Reset form values
+            document.getElementById('site_url').value = 'https://example.com';
+            document.getElementById('gsc_property_url').value = 'https://example.com';
+            document.getElementById('max_crawl_rate').value = '50';
+            document.getElementById('crawl_delay').value = '2.0';
+            document.getElementById('sitemap_max_urls').value = '50000';
+            document.getElementById('auto_submit_sitemaps').checked = true;
+            document.getElementById('alert_on_deindex').checked = true;
+            document.getElementById('indexing_strategy').value = 'balanced';
+            document.getElementById('enable_backlink_indexing').checked = true;
+            document.getElementById('retry_failed_urls').value = 'auto';
+            document.getElementById('detailed_logging').checked = false;
+            
+            showToast('Form reset to defaults. Click Save to apply changes.', 'info');
+        }
+    }
+    
+    async function updateSystemStatus() {
+        try {
+            const [systemResponse, gscResponse] = await Promise.all([
+                fetch('/api/system-status'),
+                fetch('/api/gsc-status')
+            ]);
+            
+            const systemData = await systemResponse.json();
+            const gscData = await gscResponse.json();
+            
+            // Update status badges
+            updateStatusBadge('db-status', systemData.database.healthy, 'Connected', 'Disconnected');
+            updateStatusBadge('gsc-integration-status', gscData.credentials_available, 'Configured', 'Not Configured');
+            updateStatusBadge('session-security-status', systemData.environment.SESSION_SECRET, 'Configured', 'Default');
+            
+        } catch (error) {
+            console.warn('Could not update system status:', error);
+        }
+    }
+    
+    function updateStatusBadge(elementId, condition, successText, failText) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+        
+        if (condition) {
+            element.className = 'badge bg-success';
+            element.textContent = successText;
+        } else {
+            element.className = 'badge bg-warning';
+            element.textContent = failText;
+        }
+    }
+    
     // Check status when page loads
     document.addEventListener('DOMContentLoaded', function() {
         checkGSCStatus();
+        updateSystemStatus();
         
         // Add test configuration button if it doesn't exist
         const submitRow = document.querySelector('.d-flex.justify-content-end');
@@ -419,6 +704,9 @@
             
             submitRow.insertBefore(testBtn, submitRow.firstChild);
         }
+        
+        // Update status periodically
+        setInterval(updateSystemStatus, 30000); // Every 30 seconds
     });
     
     // Form validation

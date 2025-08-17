@@ -17,33 +17,46 @@ class PuterAIAgent {
             console.log('Initializing Puter.js AI Agent...');
             
             // Check if Puter.js is available
-            if (typeof puter === 'undefined') {
+            if (typeof puter === 'undefined' || !puter) {
                 console.warn('Puter.js not loaded, using fallback mode');
                 this.isInitialized = true;
                 this.initializeUI();
                 return;
             }
             
-            // Initialize Puter.js
-            await puter.init();
+            // Wait for Puter to be ready
+            await this.waitForPuterReady();
             
-            // Get AI services
-            this.aiServices = puter.ai;
-            this.storage = puter.fs;
-            this.auth = puter.auth;
-            
-            // Check authentication status (optional for basic functionality)
+            // Try to initialize Puter.js with proper error handling
             try {
-                const isLoggedIn = await this.auth.isSignedIn();
-                if (!isLoggedIn) {
-                    console.log('User not authenticated with Puter.js - some features may be limited');
+                if (typeof puter.init === 'function') {
+                    await puter.init();
                 }
-            } catch (error) {
-                console.warn('Authentication check failed, continuing without auth:', error);
+                
+                // Get AI services if available
+                if (puter.ai) this.aiServices = puter.ai;
+                if (puter.fs) this.storage = puter.fs;
+                if (puter.auth) this.auth = puter.auth;
+                
+                // Check authentication status (optional for basic functionality)
+                if (this.auth && typeof this.auth.isSignedIn === 'function') {
+                    try {
+                        const isLoggedIn = await this.auth.isSignedIn();
+                        if (!isLoggedIn) {
+                            console.log('User not authenticated with Puter.js - some features may be limited');
+                        }
+                    } catch (error) {
+                        console.warn('Authentication check failed, continuing without auth:', error);
+                    }
+                }
+                
+                this.isInitialized = true;
+                console.log('Puter.js AI Agent initialized successfully');
+                
+            } catch (puterError) {
+                console.warn('Puter.js initialization failed, using fallback:', puterError);
+                this.isInitialized = true; // Still mark as initialized for basic functionality
             }
-            
-            this.isInitialized = true;
-            console.log('Puter.js AI Agent initialized successfully');
             
             // Initialize UI components
             this.initializeUI();
@@ -54,6 +67,27 @@ class PuterAIAgent {
             this.isInitialized = true;
             this.initializeUI();
         }
+    }
+
+    async waitForPuterReady() {
+        return new Promise((resolve) => {
+            if (typeof puter !== 'undefined' && puter) {
+                resolve();
+                return;
+            }
+            
+            let attempts = 0;
+            const checkPuter = setInterval(() => {
+                attempts++;
+                if (typeof puter !== 'undefined' && puter) {
+                    clearInterval(checkPuter);
+                    resolve();
+                } else if (attempts >= 30) { // 3 seconds timeout
+                    clearInterval(checkPuter);
+                    resolve(); // Continue with fallback
+                }
+            }, 100);
+        });
     }
 
     async promptForAuth() {

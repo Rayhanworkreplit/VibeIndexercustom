@@ -496,6 +496,42 @@ def delete_url(url_id):
     flash(f'URL deleted: {url.url}', 'success')
     return redirect(url_for('urls'))
 
+@app.route('/api/save-credentials', methods=['POST'])
+def save_credentials():
+    """Save GSC credentials (for demo purposes - actual implementation would use secrets)"""
+    try:
+        data = request.get_json()
+        credentials_json = data.get('credentials_json', '')
+        
+        if not credentials_json:
+            return jsonify({
+                'error': 'No credentials provided',
+                'status': 'error'
+            }), 400
+        
+        # Validate JSON format
+        try:
+            import json
+            json.loads(credentials_json)
+        except json.JSONDecodeError:
+            return jsonify({
+                'error': 'Invalid JSON format',
+                'status': 'error'
+            }), 400
+        
+        # In a real implementation, you would save this to a secure location
+        # For demo purposes, we'll just validate it
+        return jsonify({
+            'message': 'Credentials validated successfully. Add to Replit Secrets for production use.',
+            'status': 'success'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'status': 'error'
+        }), 500
+
 # Error handlers
 @app.errorhandler(404)
 def not_found(error):
