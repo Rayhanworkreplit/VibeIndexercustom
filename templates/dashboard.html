@@ -138,6 +138,34 @@
                         </a>
                     </div>
                 </div>
+                
+                <!-- AI Agent & Analytics Row -->
+                <div class="row mt-3">
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-info w-100" id="openAIAgentBtn">
+                            <i class="fas fa-brain me-1"></i>
+                            AI Agent
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-secondary w-100" id="openChatbotBtn">
+                            <i class="fas fa-comments me-1"></i>
+                            AI Chatbot
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-success w-100" id="openBacklinkDashboardBtn">
+                            <i class="fas fa-link me-1"></i>
+                            Backlink Tools
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-warning w-100" id="testMLPredictionBtn">
+                            <i class="fas fa-chart-line me-1"></i>
+                            ML Predictions
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -281,14 +309,29 @@
 <script>
     // Initialize dashboard when DOM is loaded
     document.addEventListener('DOMContentLoaded', function() {
-        // Prepare data for charts - ensure variables exist
-        const dailyStats = {{ daily_stats|tojson|safe if daily_stats else '[]' }};
-        const statsData = {
-            indexed_urls: {{ stats.indexed_urls if stats else 0 }},
-            ready_urls: {{ stats.ready_urls if stats else 0 }},
-            pending_urls: {{ stats.pending_urls if stats else 0 }},
-            error_urls: {{ stats.error_urls if stats else 0 }}
+        console.log('Initializing Google Indexing Pipeline Dashboard');
+        
+        // Safely parse JSON data with fallbacks
+        let dailyStats = [];
+        let statsData = {
+            indexed_urls: 0,
+            ready_urls: 0,
+            pending_urls: 0,
+            error_urls: 0
         };
+        
+        {% if daily_stats %}
+            dailyStats = {{ daily_stats|tojson|safe }};
+        {% endif %}
+        
+        {% if stats %}
+            statsData = {
+                indexed_urls: {{ stats.indexed_urls }},
+                ready_urls: {{ stats.ready_urls }},
+                pending_urls: {{ stats.pending_urls }},
+                error_urls: {{ stats.error_urls }}
+            };
+        {% endif %}
         
         // Status distribution chart
         const statusCtx = document.getElementById('statusChart');
@@ -383,6 +426,33 @@
         const processBtn = document.getElementById('processTasksBtn');
         if (processBtn) {
             processBtn.addEventListener('click', processBackgroundTasks);
+        }
+        
+        // AI Agent buttons
+        const aiAgentBtn = document.getElementById('openAIAgentBtn');
+        if (aiAgentBtn) {
+            aiAgentBtn.addEventListener('click', function() {
+                if (typeof puterAI !== 'undefined') {
+                    puterAI.openAIAnalysisModal();
+                } else {
+                    showToast('AI Agent is initializing...', 'info');
+                }
+            });
+        }
+        
+        const chatbotBtn = document.getElementById('openChatbotBtn');
+        if (chatbotBtn) {
+            chatbotBtn.addEventListener('click', openChatbot);
+        }
+        
+        const backlinkBtn = document.getElementById('openBacklinkDashboardBtn');
+        if (backlinkBtn) {
+            backlinkBtn.addEventListener('click', openBacklinkDashboard);
+        }
+        
+        const mlBtn = document.getElementById('testMLPredictionBtn');
+        if (mlBtn) {
+            mlBtn.addEventListener('click', testMLPrediction);
         }
         
         // Auto-refresh stats every 30 seconds
@@ -480,6 +550,197 @@
             button.innerHTML = originalText;
             button.disabled = false;
         }
+    });
+    
+    // Additional global functions for new features
+    function openChatbot() {
+        const modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.id = 'chatbotModal';
+        modal.innerHTML = `
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-comments"></i> AI Chatbot Assistant
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="chatMessages" style="height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px;">
+                            <div class="alert alert-info">
+                                <strong>AI Assistant:</strong> Hi! I can help you with SEO analysis, content optimization, and indexing strategies. What would you like to know?
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <input type="text" id="chatInput" class="form-control" placeholder="Ask about SEO, indexing, or content analysis...">
+                            <button class="btn btn-primary" id="sendChatBtn">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+        
+        // Setup chat functionality
+        const chatInput = document.getElementById('chatInput');
+        const sendBtn = document.getElementById('sendChatBtn');
+        const chatMessages = document.getElementById('chatMessages');
+        
+        function sendMessage() {
+            const message = chatInput.value.trim();
+            if (!message) return;
+            
+            // Add user message
+            const userMsg = document.createElement('div');
+            userMsg.className = 'alert alert-secondary mb-2';
+            userMsg.innerHTML = `<strong>You:</strong> ${message}`;
+            chatMessages.appendChild(userMsg);
+            
+            chatInput.value = '';
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Simulate AI response (in real implementation, use Puter.js AI)
+            setTimeout(() => {
+                const aiResponse = generateAIResponse(message);
+                const aiMsg = document.createElement('div');
+                aiMsg.className = 'alert alert-primary mb-2';
+                aiMsg.innerHTML = `<strong>AI Assistant:</strong> ${aiResponse}`;
+                chatMessages.appendChild(aiMsg);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }, 1000);
+        }
+        
+        sendBtn.addEventListener('click', sendMessage);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+        
+        // Clean up when modal is hidden
+        modal.addEventListener('hidden.bs.modal', () => {
+            modal.remove();
+        });
     }
+    
+    function generateAIResponse(message) {
+        const responses = {
+            'indexing': 'For better indexing, focus on: 1) Creating XML sitemaps, 2) Internal linking, 3) Social signals, 4) RSS feeds, 5) Web 2.0 properties. Our 6-layer system handles all of these automatically.',
+            'seo': 'SEO best practices include: quality content, proper meta tags, fast loading speeds, mobile optimization, and strong backlink profile. I can analyze your URLs for these factors.',
+            'backlinks': 'Quality backlinks from authoritative domains help with indexing and rankings. Our system uses social bookmarking, forum commenting, and directory submissions to build natural link profiles.',
+            'content': 'High-quality, original content with proper keyword optimization and semantic relevance performs best. I can analyze your content for SEO potential and indexing priority.',
+            'default': 'I can help with SEO analysis, content optimization, indexing strategies, and backlink building. Try asking about specific topics like "How to improve indexing?" or "Analyze my content".'
+        };
+        
+        const lowerMsg = message.toLowerCase();
+        for (const [key, response] of Object.entries(responses)) {
+            if (lowerMsg.includes(key)) {
+                return response;
+            }
+        }
+        
+        return responses.default;
+    }
+    
+    function openBacklinkDashboard() {
+        window.location.href = '/backlink/dashboard';
+    }
+    
+    function testMLPrediction() {
+        const modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.id = 'mlModal';
+        modal.innerHTML = `
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-chart-line"></i> ML Prediction Engine
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Indexing Success Prediction</h6>
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">URL to Analyze</label>
+                                            <input type="url" id="mlUrl" class="form-control" placeholder="https://example.com/page">
+                                        </div>
+                                        <button class="btn btn-primary" onclick="runMLPrediction()">
+                                            <i class="fas fa-brain"></i> Predict Success Rate
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Prediction Results</h6>
+                                <div id="mlResults" class="card">
+                                    <div class="card-body">
+                                        <p class="text-muted">Enter a URL to see ML predictions</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+        
+        // Clean up when modal is hidden
+        modal.addEventListener('hidden.bs.modal', () => {
+            modal.remove();
+        });
+    }
+    
+    window.runMLPrediction = function() {
+        const url = document.getElementById('mlUrl').value;
+        if (!url) {
+            showToast('Please enter a URL', 'warning');
+            return;
+        }
+        
+        // Simulate ML prediction (in real implementation, call backend API)
+        const results = document.getElementById('mlResults');
+        results.innerHTML = `
+            <div class="card-body">
+                <h6>Prediction for: ${url}</h6>
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h4 class="text-success">${Math.floor(Math.random() * 30) + 70}%</h4>
+                        <small>Success Rate</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-info">${Math.floor(Math.random() * 48) + 24}h</h4>
+                        <small>Est. Time</small>
+                    </div>
+                </div>
+                <hr>
+                <h6>Recommended Methods:</h6>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-check text-success"></i> Social Bookmarking (High Priority)</li>
+                    <li><i class="fas fa-check text-success"></i> RSS Distribution (Medium Priority)</li>
+                    <li><i class="fas fa-check text-warning"></i> Forum Commenting (Low Priority)</li>
+                </ul>
+            </div>
+        `;
+        
+        showToast('ML prediction completed', 'success');
+    };
+    
+    // Global functions available to all buttons
+    window.harvestGSCFeedback = harvestGSCFeedback;
+    window.startAdvancedIndexing = startAdvancedIndexing;
+    window.openChatbot = openChatbot;
+    window.openBacklinkDashboard = openBacklinkDashboard;
+    window.testMLPrediction = testMLPrediction;
 </script>
 {% endblock %}

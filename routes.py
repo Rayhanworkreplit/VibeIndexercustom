@@ -362,3 +362,38 @@ def start_advanced_indexing():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/analyze-content', methods=['POST'])
+def analyze_content():
+    """Analyze URL content for AI agent"""
+    try:
+        data = request.get_json()
+        url = data.get('url')
+        
+        if not url:
+            return jsonify({'error': 'URL is required'}), 400
+        
+        # Use the web scraper to get content
+        from services.url_discovery import get_website_text_content
+        content = get_website_text_content(url)
+        
+        if not content:
+            return jsonify({'error': 'Could not extract content from URL'}), 400
+        
+        # Basic content analysis
+        word_count = len(content.split())
+        content_length = len(content)
+        content_preview = content[:500] + "..." if len(content) > 500 else content
+        
+        return jsonify({
+            'url': url,
+            'title': '',  # Could extract title if needed
+            'content_length': content_length,
+            'word_count': word_count,
+            'content_preview': content_preview,
+            'content_type': 'text/html',
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
