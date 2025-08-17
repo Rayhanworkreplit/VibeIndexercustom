@@ -576,7 +576,16 @@ def start_advanced_indexing():
 @app.route('/ai-agent')
 def ai_agent():
     """AI Agent interface for indexing management"""
-    return render_template('ai_agent.html')
+    # Get current stats for the AI agent page
+    total_urls = URL.query.count()
+    indexed_urls = URL.query.filter_by(status='indexed').count()
+    
+    stats = {
+        'total_urls': total_urls,
+        'indexed_urls': indexed_urls
+    }
+    
+    return render_template('ai_agent.html', stats=stats)
 
 @app.route('/api/analyze-content', methods=['POST'])
 def analyze_content():
