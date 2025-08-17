@@ -1,0 +1,196 @@
+{% extends "layout.html" %}
+
+{% block title %}Configuration - Backlink Indexer{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('backlink.dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item active">Configuration</li>
+                </ol>
+            </nav>
+            
+            <h1><i class="fas fa-cog"></i> Backlink Indexer Configuration</h1>
+            <p class="lead">Configure indexing methods, browser settings, and performance parameters</p>
+        </div>
+    </div>
+
+    <form method="POST">
+        <div class="row">
+            <!-- Browser Settings -->
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-browser"></i> Browser Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="max_concurrent_browsers" class="form-label">Max Concurrent Browsers</label>
+                            <input type="number" class="form-control" id="max_concurrent_browsers" 
+                                   name="max_concurrent_browsers" value="{{ config.max_concurrent_browsers }}" min="1" max="50">
+                            <div class="form-text">Number of browser instances to run simultaneously</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="headless_mode" 
+                                       name="headless_mode" {% if config.headless_mode %}checked{% endif %}>
+                                <label class="form-check-label" for="headless_mode">
+                                    Headless Mode
+                                </label>
+                            </div>
+                            <div class="form-text">Run browsers without GUI (recommended for servers)</div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-6">
+                                <label for="min_delay_between_actions" class="form-label">Min Delay (seconds)</label>
+                                <input type="number" class="form-control" id="min_delay_between_actions" 
+                                       name="min_delay_between_actions" value="{{ config.min_delay_between_actions }}" 
+                                       step="0.1" min="0.1">
+                            </div>
+                            <div class="col-6">
+                                <label for="max_delay_between_actions" class="form-label">Max Delay (seconds)</label>
+                                <input type="number" class="form-control" id="max_delay_between_actions" 
+                                       name="max_delay_between_actions" value="{{ config.max_delay_between_actions }}" 
+                                       step="0.1" min="0.1">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Indexing Methods -->
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-tools"></i> Indexing Methods</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="social_bookmarking_enabled" 
+                                       name="social_bookmarking_enabled" {% if config.social_bookmarking_enabled %}checked{% endif %}>
+                                <label class="form-check-label" for="social_bookmarking_enabled">
+                                    <strong>Social Bookmarking</strong>
+                                    <small class="d-block text-muted">Reddit, Digg, StumbleUpon (75% success rate)</small>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="rss_distribution_enabled" 
+                                       name="rss_distribution_enabled" {% if config.rss_distribution_enabled %}checked{% endif %}>
+                                <label class="form-check-label" for="rss_distribution_enabled">
+                                    <strong>RSS Distribution</strong>
+                                    <small class="d-block text-muted">Feed syndication and pings (85% success rate)</small>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="web2_posting_enabled" 
+                                       name="web2_posting_enabled" {% if config.web2_posting_enabled %}checked{% endif %}>
+                                <label class="form-check-label" for="web2_posting_enabled">
+                                    <strong>Web 2.0 Posting</strong>
+                                    <small class="d-block text-muted">Blogger, WordPress, Medium (80% success rate)</small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Settings -->
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-tachometer-alt"></i> Performance Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="success_threshold" class="form-label">Success Threshold</label>
+                            <input type="number" class="form-control" id="success_threshold" 
+                                   name="success_threshold" value="{{ config.success_threshold }}" 
+                                   step="0.01" min="0.01" max="1.0">
+                            <div class="form-text">Minimum success rate to consider URL indexed (0.01-1.0)</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="batch_size" class="form-label">Batch Size</label>
+                            <input type="number" class="form-control" id="batch_size" 
+                                   name="batch_size" value="{{ config.batch_size }}" min="1" max="1000">
+                            <div class="form-text">Number of URLs to process per batch</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Expected Results -->
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-chart-bar"></i> Expected Performance</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Social Bookmarking</span>
+                                <span class="text-muted">75%</span>
+                            </div>
+                            <div class="progress mb-2" style="height: 8px;">
+                                <div class="progress-bar bg-warning" style="width: 75%"></div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>RSS Distribution</span>
+                                <span class="text-muted">85%</span>
+                            </div>
+                            <div class="progress mb-2" style="height: 8px;">
+                                <div class="progress-bar bg-success" style="width: 85%"></div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Web 2.0 Posting</span>
+                                <span class="text-muted">80%</span>
+                            </div>
+                            <div class="progress mb-2" style="height: 8px;">
+                                <div class="progress-bar bg-primary" style="width: 80%"></div>
+                            </div>
+                        </div>
+
+                        <hr>
+                        <div class="text-center">
+                            <strong class="text-success">Combined Success Rate: 95%+</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <button type="submit" class="btn btn-primary btn-lg me-3">
+                            <i class="fas fa-save"></i> Save Configuration
+                        </button>
+                        <a href="{{ url_for('backlink.dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

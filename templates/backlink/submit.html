@@ -1,0 +1,202 @@
+{% extends "layout.html" %}
+
+{% block title %}Submit URLs - Backlink Indexer{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('backlink.dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item active">Submit URLs</li>
+                </ol>
+            </nav>
+            
+            <h1><i class="fas fa-upload"></i> Submit URLs for Indexing</h1>
+            <p class="lead">Submit URLs to be processed through multiple indexing methods</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-list"></i> URL Submission Form</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="urls" class="form-label">URLs to Index</label>
+                            <textarea class="form-control" id="urls" name="urls" rows="10" 
+                                      placeholder="https://example.com/page1&#10;https://example.com/page2&#10;https://example.com/page3" 
+                                      required></textarea>
+                            <div class="form-text">Enter one URL per line. All URLs must start with http:// or https://</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Default Title (Optional)</label>
+                            <input type="text" class="form-control" id="title" name="title" 
+                                   placeholder="Default title for social bookmarking and posting">
+                            <div class="form-text">Used when platforms require a title for submissions</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="topic" class="form-label">Topic/Category (Optional)</label>
+                            <input type="text" class="form-control" id="topic" name="topic" 
+                                   placeholder="e.g., technology, marketing, education">
+                            <div class="form-text">Helps generate more relevant content for Web 2.0 posts</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description (Optional)</label>
+                            <textarea class="form-control" id="description" name="description" rows="3"
+                                      placeholder="Brief description of the content"></textarea>
+                            <div class="form-text">Used for RSS feed descriptions and post content</div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-rocket"></i> Start Indexing Process
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <!-- Process Overview -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6><i class="fas fa-info-circle"></i> Process Overview</h6>
+                </div>
+                <div class="card-body">
+                    <div class="process-step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <strong>Social Bookmarking</strong>
+                            <small class="d-block text-muted">Submit to Reddit, Digg, etc.</small>
+                        </div>
+                    </div>
+                    <div class="process-step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <strong>RSS Distribution</strong>
+                            <small class="d-block text-muted">Create feeds and ping aggregators</small>
+                        </div>
+                    </div>
+                    <div class="process-step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <strong>Web 2.0 Posting</strong>
+                            <small class="d-block text-muted">Create posts on Blogger, WordPress</small>
+                        </div>
+                    </div>
+                    <div class="process-step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <strong>Verification</strong>
+                            <small class="d-block text-muted">Monitor and report success</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Expected Results -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6><i class="fas fa-chart-line"></i> Expected Results</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <span>Social Bookmarking</span>
+                            <span class="text-muted">75%</span>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar bg-warning" style="width: 75%"></div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <span>RSS Distribution</span>
+                            <span class="text-muted">85%</span>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar bg-success" style="width: 85%"></div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <span>Web 2.0 Posting</span>
+                            <span class="text-muted">80%</span>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar bg-primary" style="width: 80%"></div>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="text-center">
+                        <strong>Overall Success: 95%+</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tips -->
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-lightbulb"></i> Tips for Best Results</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <small>Use descriptive titles and topics</small>
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <small>Submit 50-100 URLs per batch</small>
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <small>Allow 2-4 hours for completion</small>
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            <small>Check status page for progress</small>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.process-step {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.step-number {
+    width: 24px;
+    height: 24px;
+    background: #007bff;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    margin-right: 12px;
+    flex-shrink: 0;
+}
+
+.step-content {
+    flex: 1;
+}
+</style>
+{% endblock %}

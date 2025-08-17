@@ -1,0 +1,234 @@
+{% extends "layout.html" %}
+
+{% block title %}Task Status - Backlink Indexer{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('backlink.dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item active">Task Status</li>
+                </ol>
+            </nav>
+            
+            <h1><i class="fas fa-tasks"></i> Task Status</h1>
+            <p class="lead">Monitor the progress of your indexing task</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Task Overview -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5><i class="fas fa-info-circle"></i> Task Information</h5>
+                        <span class="badge bg-{% if task.status == 'completed' %}success{% elif task.status == 'processing' %}warning{% elif task.status == 'error' %}danger{% else %}secondary{% endif %}">
+                            {{ task.status.title() }}
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Task ID:</strong> {{ task.id }}<br>
+                            <strong>Created:</strong> {{ task.created_at }}<br>
+                            <strong>URLs:</strong> {{ task.urls|length }} total
+                        </div>
+                        <div class="col-md-6">
+                            {% if task.metadata.title %}
+                            <strong>Title:</strong> {{ task.metadata.title }}<br>
+                            {% endif %}
+                            {% if task.metadata.topic %}
+                            <strong>Topic:</strong> {{ task.metadata.topic }}<br>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- URLs List -->
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-list"></i> URLs in Task</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>URL</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for url in task.urls %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>
+                                        <a href="{{ url }}" target="_blank" class="text-decoration-none">
+                                            {{ url|truncate(60) }}
+                                            <i class="fas fa-external-link-alt fa-sm ms-1"></i>
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {% if task.status == 'pending' %}
+                                        <span class="badge bg-secondary">Pending</span>
+                                        {% elif task.status == 'processing' %}
+                                        <span class="badge bg-warning">Processing</span>
+                                        {% elif task.status == 'completed' %}
+                                        <span class="badge bg-success">Completed</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ task.status.title() }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if task.status == 'completed' %}
+                                        <button class="btn btn-sm btn-outline-info" onclick="showUrlDetails('{{ url }}')">
+                                            <i class="fas fa-chart-line"></i> Details
+                                        </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar with Progress -->
+        <div class="col-md-4">
+            <!-- Progress Card -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6><i class="fas fa-clock"></i> Progress</h6>
+                </div>
+                <div class="card-body">
+                    {% if task.status == 'pending' %}
+                    <div class="text-center">
+                        <div class="spinner-border text-secondary mb-3" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p>Task is queued for processing...</p>
+                    </div>
+                    {% elif task.status == 'processing' %}
+                    <div class="text-center">
+                        <div class="spinner-border text-warning mb-3" role="status">
+                            <span class="visually-hidden">Processing...</span>
+                        </div>
+                        <p>Processing URLs through indexing methods...</p>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 style="width: 45%"></div>
+                        </div>
+                    </div>
+                    {% elif task.status == 'completed' %}
+                    <div class="text-center">
+                        <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
+                        <p><strong>Task Completed!</strong></p>
+                        <div class="progress">
+                            <div class="progress-bar bg-success" style="width: 100%"></div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center">
+                        <i class="fas fa-question-circle text-muted fa-3x mb-3"></i>
+                        <p>Status: {{ task.status.title() }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Actions Card -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6><i class="fas fa-tools"></i> Actions</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary" onclick="refreshStatus()">
+                            <i class="fas fa-sync-alt"></i> Refresh Status
+                        </button>
+                        {% if task.status == 'completed' %}
+                        <button class="btn btn-outline-success" onclick="downloadReport()">
+                            <i class="fas fa-download"></i> Download Report
+                        </button>
+                        {% endif %}
+                        <a href="{{ url_for('backlink.dashboard') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Method Status -->
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="fas fa-chart-pie"></i> Method Status</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <span>Social Bookmarking</span>
+                            <span class="text-muted">{% if task.status == 'completed' %}Done{% else %}Pending{% endif %}</span>
+                        </div>
+                        <div class="progress" style="height: 4px;">
+                            <div class="progress-bar bg-danger" 
+                                 style="width: {% if task.status == 'completed' %}75{% elif task.status == 'processing' %}30{% else %}0{% endif %}%"></div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <span>RSS Distribution</span>
+                            <span class="text-muted">{% if task.status == 'completed' %}Done{% else %}Pending{% endif %}</span>
+                        </div>
+                        <div class="progress" style="height: 4px;">
+                            <div class="progress-bar bg-success" 
+                                 style="width: {% if task.status == 'completed' %}85{% elif task.status == 'processing' %}40{% else %}0{% endif %}%"></div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <span>Web 2.0 Posting</span>
+                            <span class="text-muted">{% if task.status == 'completed' %}Done{% else %}Pending{% endif %}</span>
+                        </div>
+                        <div class="progress" style="height: 4px;">
+                            <div class="progress-bar bg-primary" 
+                                 style="width: {% if task.status == 'completed' %}80{% elif task.status == 'processing' %}25{% else %}0{% endif %}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function refreshStatus() {
+    window.location.reload();
+}
+
+function downloadReport() {
+    // In a real implementation, this would generate and download a report
+    alert('Report download functionality will be implemented soon!');
+}
+
+function showUrlDetails(url) {
+    // Show modal or navigate to detailed results
+    alert('URL details for: ' + url);
+}
+
+// Auto-refresh if task is processing
+{% if task.status == 'processing' %}
+setTimeout(function() {
+    window.location.reload();
+}, 30000); // Refresh every 30 seconds
+{% endif %}
+</script>
+{% endblock %}

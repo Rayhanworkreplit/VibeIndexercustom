@@ -33,6 +33,10 @@ with app.app_context():
     import models
     import routes
     
+    # Register backlink indexer blueprint
+    from backlink_routes import backlink_bp
+    app.register_blueprint(backlink_bp)
+    
     # Create all tables
     db.create_all()
     

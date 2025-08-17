@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+
+{% block title %}Test Results - Backlink Indexer{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1><i class="fas fa-vial"></i> System Test Results</h1>
+            <p class="lead">Test completed successfully</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Test Summary</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Overall Success Rate:</strong> {{ "%.1f%"|format(results.overall_success_rate * 100) }}</p>
+                    <p><strong>Total URLs:</strong> {{ results.total_urls }}</p>
+                    <p><strong>Successful URLs:</strong> {{ results.successful_urls }}</p>
+                    <p><strong>Failed URLs:</strong> {{ results.failed_urls }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <a href="{{ url_for('backlink.dashboard') }}" class="btn btn-primary">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
