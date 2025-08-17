@@ -1,0 +1,24 @@
+# Optimized robots.txt for crawl focus
+User-agent: *
+Allow: /
+
+# Sitemap locations
+Sitemap: https://example.com/sitemaps/sitemap.xml
+Sitemap: https://example.com/sitemaps/sitemap_index.xml
+
+# Crawl rate optimization
+Crawl-delay: 1
+
+# Block low-value pages to focus crawl budget
+Disallow: /admin/
+Disallow: /private/
+Disallow: /temp/
+Disallow: /*.pdf$
+Disallow: /*?print=1
+Disallow: /*&print=1
+
+# Allow important directories
+Allow: /sitemaps/
+Allow: /rss/
+
+# Generated on: 2025-08-17 09:58:29 UTC
