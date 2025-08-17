@@ -1,5 +1,6 @@
 """
-SERP (Search Engine Results Page) checker for indexing verification
+SERP (Search Engine Results Page) verification system
+Checks if URLs are indexed by scraping search results
 """
 
 import asyncio
@@ -7,210 +8,141 @@ import aiohttp
 import random
 import time
 import logging
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
-from urllib.parse import urlencode, quote_plus
+from typing import List, Dict, Optional, Any
+from urllib.parse import quote, urljoin
+from bs4 import BeautifulSoup
+from fake_useragent import UserAgent
+from ..models import SERPResult
+from ..anti_detection.stealth_browser import StealthBrowserManager
 
 
 class SERPChecker:
-    """Advanced SERP checking for indexing verification"""
+    """
+    Advanced SERP checker for verifying URL indexing status
+    Supports multiple search engines with anti-detection
+    """
     
     def __init__(self, config):
         self.config = config
-        self.setup_logging()
+        self.user_agent = UserAgent()
+        self.browser_manager = StealthBrowserManager(config)
+        self.session_timeout = aiohttp.ClientTimeout(total=30)
+        self.logger = logging.getLogger(__name__)
         
-        # Search engines to check
         self.search_engines = {
             'google': {
-                'search_url': 'https://www.google.com/search',
-                'params': {'q': '', 'num': 20, 'hl': 'en'},
-                'result_selector': '.g',
-                'link_selector': 'h3 a',
-                'authority_weight': 0.9
+                'url': 'https://www.google.com/search',
+                'params': {'q': '{query}', 'num': 20},
+                'result_selector': '.g .yuRUbf a',
+                'title_selector': 'h3',
+                'snippet_selector': '.VwiC3b'
             },
             'bing': {
-                'search_url': 'https://www.bing.com/search',
-                'params': {'q': '', 'count': 20},
-                'result_selector': '.b_algo',
-                'link_selector': 'h2 a',
-                'authority_weight': 0.7
+                'url': 'https://www.bing.com/search',
+                'params': {'q': '{query}', 'count': 20},
+                'result_selector': '.b_algo h2 a',
+                'title_selector': '',
+                'snippet_selector': '.b_caption p'
+            },
+            'yandex': {
+                'url': 'https://yandex.com/search/',
+                'params': {'text': '{query}', 'numdoc': 20},
+                'result_selector': '.organic__url a',
+                'title_selector': '.organic__title-wrapper',
+                'snippet_selector': '.organic__text'
             },
             'duckduckgo': {
-                'search_url': 'https://duckduckgo.com/html',
-                'params': {'q': '', 'kl': 'us-en'},
-                'result_selector': '.result',
-                'link_selector': '.result__a',
-                'authority_weight': 0.5
+                'url': 'https://duckduckgo.com/html/',
+                'params': {'q': '{query}'},
+                'result_selector': '.result__a',
+                'title_selector': '.result__title',
+                'snippet_selector': '.result__snippet'
             }
         }
-        
-        # Query patterns for checking
-        self.query_patterns = [
-            'site:{domain}',
-            'site:{domain} "{keyword}"',
-            '"{full_url}"',
-            'inurl:{path}',
-            '"{title}" site:{domain}'
-        ]
-        
-        # Rate limiting
-        self.last_request_time = {}
-        self.min_delay_between_requests = 5  # seconds
-        
-    def setup_logging(self):
-        """Configure logging for SERP checking"""
-        self.logger = logging.getLogger(f"{__name__}.SERPChecker")
     
-    async def check_url_indexing(self, url: str, metadata: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Check if URL is indexed in search engines"""
+    async def check_url_indexed(self, url: str, search_engines: List[str] = None) -> Dict[str, SERPResult]:
+        """Check if URL is indexed across multiple search engines"""
+        
+        if search_engines is None:
+            search_engines = ['google', 'bing']
+        
+        # Generate search queries for the URL
+        queries = self._generate_search_queries(url)
+        results = {}
+        
+        for engine in search_engines:
+            if engine not in self.search_engines:
+                self.logger.warning(f"Unknown search engine: {engine}")
+                continue
+            
+            engine_results = []
+            
+            for query in queries:
+                try:
+                    result = await self._search_engine(engine, query)
+                    
+                    # Check if URL appears in results
+                    found = self._check_url_in_results(url, result.get('results', []))
+                    
+                    serp_result = SERPResult(
+                        url=url,
+                        query=query,
+                        search_engine=engine,
+                        found=found['found'],
+                        position=found.get('position'),
+                        title=found.get('title'),
+                        snippet=found.get('snippet')
+                    )
+                    
+                    engine_results.append(serp_result)
+                    
+                    # Add delay between queries to avoid rate limiting
+                    await asyncio.sleep(random.uniform(2, 5))
+                    
+                except Exception as e:
+                    self.logger.error(f"Error checking {url} on {engine}: {str(e)}")
+            
+            results[engine] = engine_results
+        
+        return results
+    
+    def _generate_search_queries(self, url: str) -> List[str]:
+        """Generate effective search queries for a URL"""
         from urllib.parse import urlparse
         
         parsed_url = urlparse(url)
-        domain = parsed_url.netloc.replace('www.', '')
+        domain = parsed_url.netloc
         path = parsed_url.path
         
-        metadata = metadata or {}
-        title = metadata.get('title', '')
-        keywords = metadata.get('keywords', [])
+        queries = [
+            f'site:{domain} "{path}"',  # Exact path search
+            f'site:{domain}',           # Domain search
+            f'"{url}"',                 # Exact URL search
+        ]
         
-        indexing_results = {
-            'url': url,
-            'domain': domain,
-            'indexed_engines': [],
-            'total_engines_checked': 0,
-            'indexing_score': 0.0,
-            'search_results': {},
-            'timestamp': datetime.now().isoformat()
-        }
+        # Add additional query variations
+        if len(path) > 1:
+            path_parts = [part for part in path.split('/') if part]
+            if path_parts:
+                # Search for path components
+                queries.append(f'site:{domain} {" ".join(path_parts[:3])}')
         
-        # Generate search queries
-        search_queries = self.generate_search_queries(url, domain, path, title, keywords)
-        
-        # Check each search engine
-        for engine_name, engine_config in self.search_engines.items():
-            try:
-                engine_result = await self.check_engine_indexing(
-                    engine_name, engine_config, search_queries, url
-                )
-                
-                indexing_results['search_results'][engine_name] = engine_result
-                indexing_results['total_engines_checked'] += 1
-                
-                if engine_result['indexed']:
-                    indexing_results['indexed_engines'].append(engine_name)
-                
-                # Add weighted score
-                if engine_result['indexed']:
-                    indexing_results['indexing_score'] += engine_config['authority_weight']
-                
-                # Rate limiting between engines
-                await asyncio.sleep(random.uniform(3, 7))
-                
-            except Exception as e:
-                self.logger.error(f"Error checking {engine_name}: {str(e)}")
-                indexing_results['search_results'][engine_name] = {
-                    'indexed': False,
-                    'error': str(e),
-                    'queries_tried': 0
-                }
-        
-        # Normalize indexing score
-        max_possible_score = sum(config['authority_weight'] for config in self.search_engines.values())
-        if max_possible_score > 0:
-            indexing_results['indexing_score'] = indexing_results['indexing_score'] / max_possible_score
-        
-        return indexing_results
+        return queries
     
-    def generate_search_queries(self, url: str, domain: str, path: str, title: str, keywords: List[str]) -> List[str]:
-        """Generate various search queries to check for indexing"""
-        queries = []
+    async def _search_engine(self, engine: str, query: str) -> Dict[str, Any]:
+        """Perform search on specified search engine"""
         
-        # Extract main keyword from title or URL
-        main_keyword = ''
-        if title:
-            # Use first few words of title as keyword
-            title_words = title.split()[:3]
-            main_keyword = ' '.join(title_words)
-        elif keywords:
-            main_keyword = keywords[0] if isinstance(keywords, list) else str(keywords)
+        engine_config = self.search_engines[engine]
+        search_url = engine_config['url']
         
-        # Generate queries based on patterns
-        for pattern in self.query_patterns:
-            try:
-                if '{domain}' in pattern:
-                    query = pattern.format(domain=domain, keyword=main_keyword, 
-                                         full_url=url, path=path, title=title)
-                    if query and len(query.strip()) > 5:  # Valid query
-                        queries.append(query.strip())
-            except:
-                continue
-        
-        # Add direct URL search
-        queries.append(f'"{url}"')
-        
-        # Add domain-specific searches
-        queries.append(f'site:{domain}')
-        
-        # Remove duplicates while preserving order
-        unique_queries = []
-        for query in queries:
-            if query not in unique_queries:
-                unique_queries.append(query)
-        
-        return unique_queries[:5]  # Limit to top 5 queries
-    
-    async def check_engine_indexing(self, engine_name: str, engine_config: Dict[str, Any], 
-                                  queries: List[str], target_url: str) -> Dict[str, Any]:
-        """Check indexing status on a specific search engine"""
-        result = {
-            'indexed': False,
-            'queries_tried': 0,
-            'matches_found': 0,
-            'positions': [],
-            'query_results': {}
-        }
-        
-        # Rate limiting
-        await self.respect_rate_limit(engine_name)
-        
-        for query in queries:
-            try:
-                query_result = await self.perform_search(engine_name, engine_config, query)
-                result['queries_tried'] += 1
-                result['query_results'][query] = query_result
-                
-                # Check if target URL is in results
-                position = self.find_url_in_results(target_url, query_result.get('urls', []))
-                
-                if position is not None:
-                    result['indexed'] = True
-                    result['matches_found'] += 1
-                    result['positions'].append({
-                        'query': query,
-                        'position': position
-                    })
-                
-                # Rate limiting between queries
-                await asyncio.sleep(random.uniform(2, 4))
-                
-            except Exception as e:
-                self.logger.debug(f"Query failed for {engine_name}: {query} - {str(e)}")
-                result['query_results'][query] = {'error': str(e)}
-        
-        return result
-    
-    async def perform_search(self, engine_name: str, engine_config: Dict[str, Any], query: str) -> Dict[str, Any]:
-        """Perform actual search query on search engine"""
-        search_url = engine_config['search_url']
-        params = engine_config['params'].copy()
-        params['q'] = query
-        
-        # Build request URL
-        full_url = f"{search_url}?{urlencode(params)}"
+        # Format query parameters
+        params = {}
+        for key, value in engine_config['params'].items():
+            params[key] = value.format(query=quote(query))
         
         headers = {
-            'User-Agent': self.get_random_user_agent(),
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'User-Agent': self.user_agent.random,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.5',
             'Accept-Encoding': 'gzip, deflate',
             'DNT': '1',
@@ -218,191 +150,197 @@ class SERPChecker:
             'Upgrade-Insecure-Requests': '1'
         }
         
-        timeout = aiohttp.ClientTimeout(total=30)
-        
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get(full_url, headers=headers) as response:
-                if response.status == 200:
-                    html_content = await response.text()
-                    return self.parse_search_results(html_content, engine_config)
-                else:
-                    raise Exception(f"HTTP {response.status}: {response.reason}")
-    
-    def parse_search_results(self, html_content: str, engine_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse search results HTML to extract URLs"""
         try:
-            from bs4 import BeautifulSoup
-            
-            soup = BeautifulSoup(html_content, 'html.parser')
-            
-            # Find result containers
-            result_containers = soup.select(engine_config['result_selector'])
-            
-            urls = []
-            for container in result_containers[:20]:  # Top 20 results
-                try:
-                    # Find link within container
-                    link_element = container.select_one(engine_config['link_selector'])
-                    if link_element and link_element.get('href'):
-                        url = link_element['href']
+            async with aiohttp.ClientSession(timeout=self.session_timeout) as session:
+                async with session.get(search_url, params=params, headers=headers) as response:
+                    if response.status == 200:
+                        html = await response.text()
+                        return self._parse_search_results(html, engine_config)
+                    else:
+                        self.logger.error(f"Search request failed with status {response.status}")
+                        return {'results': []}
                         
-                        # Clean URL (remove Google redirect, etc.)
-                        cleaned_url = self.clean_search_result_url(url)
-                        if cleaned_url:
-                            urls.append(cleaned_url)
-                            
-                except Exception as e:
-                    continue
-            
-            return {
-                'urls': urls,
-                'total_results': len(urls)
-            }
-            
+        except asyncio.TimeoutError:
+            self.logger.error(f"Search timeout for {engine}")
+            return {'results': []}
         except Exception as e:
-            self.logger.error(f"Failed to parse search results: {str(e)}")
-            return {'urls': [], 'total_results': 0}
+            self.logger.error(f"Search error for {engine}: {str(e)}")
+            return {'results': []}
     
-    def clean_search_result_url(self, url: str) -> Optional[str]:
-        """Clean search result URL (remove redirects, etc.)"""
-        try:
-            from urllib.parse import urlparse, parse_qs
-            
-            # Handle Google redirect URLs
-            if 'google.com/url?' in url:
-                parsed = urlparse(url)
-                query_params = parse_qs(parsed.query)
-                if 'url' in query_params:
-                    return query_params['url'][0]
-                elif 'q' in query_params:
-                    return query_params['q'][0]
-            
-            # Handle Bing redirect URLs
-            if 'bing.com/ck/a?' in url:
-                parsed = urlparse(url)
-                query_params = parse_qs(parsed.query)
-                if 'u' in query_params:
-                    # Bing uses base64 encoding sometimes
-                    return query_params['u'][0]
-            
-            # Return URL as-is if no cleaning needed
-            if url.startswith('http'):
-                return url
-            
-            return None
-            
-        except Exception:
-            return None
-    
-    def find_url_in_results(self, target_url: str, result_urls: List[str]) -> Optional[int]:
-        """Find target URL in search results and return position"""
-        try:
-            from urllib.parse import urlparse
-            
-            target_parsed = urlparse(target_url)
-            target_domain = target_parsed.netloc.replace('www.', '')
-            target_path = target_parsed.path.rstrip('/')
-            
-            for i, result_url in enumerate(result_urls):
-                try:
-                    result_parsed = urlparse(result_url)
-                    result_domain = result_parsed.netloc.replace('www.', '')
-                    result_path = result_parsed.path.rstrip('/')
-                    
-                    # Exact match
-                    if target_url == result_url:
-                        return i + 1
-                    
-                    # Domain and path match
-                    if target_domain == result_domain and target_path == result_path:
-                        return i + 1
-                    
-                    # Subdomain match (for broader coverage)
-                    if target_domain in result_domain or result_domain in target_domain:
-                        if target_path == result_path:
-                            return i + 1
-                            
-                except Exception:
-                    continue
-            
-            return None
-            
-        except Exception as e:
-            self.logger.debug(f"URL matching failed: {str(e)}")
-            return None
-    
-    async def respect_rate_limit(self, engine_name: str):
-        """Ensure rate limiting between requests"""
-        if engine_name in self.last_request_time:
-            time_since_last = time.time() - self.last_request_time[engine_name]
-            if time_since_last < self.min_delay_between_requests:
-                wait_time = self.min_delay_between_requests - time_since_last
-                await asyncio.sleep(wait_time)
+    def _parse_search_results(self, html: str, engine_config: Dict) -> Dict[str, Any]:
+        """Parse search engine results HTML"""
         
-        self.last_request_time[engine_name] = time.time()
-    
-    def get_random_user_agent(self) -> str:
-        """Get a random user agent for searches"""
-        user_agents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/121.0'
-        ]
-        return random.choice(user_agents)
-    
-    async def batch_check_indexing(self, urls: List[str], metadata_list: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-        """Check indexing status for multiple URLs"""
-        metadata_list = metadata_list or [{}] * len(urls)
-        
+        soup = BeautifulSoup(html, 'html.parser')
         results = []
-        for i, url in enumerate(urls):
-            metadata = metadata_list[i] if i < len(metadata_list) else {}
+        
+        try:
+            # Find result containers
+            result_elements = soup.select(engine_config['result_selector'])
             
-            try:
-                result = await self.check_url_indexing(url, metadata)
-                results.append(result)
-                
-                # Delay between URL checks to avoid being blocked
+            for i, element in enumerate(result_elements):
+                try:
+                    # Extract URL
+                    url = element.get('href', '')
+                    if not url.startswith('http'):
+                        continue
+                    
+                    # Extract title
+                    title = ""
+                    if engine_config['title_selector']:
+                        title_elem = element.select_one(engine_config['title_selector'])
+                        if title_elem:
+                            title = title_elem.get_text(strip=True)
+                    else:
+                        title = element.get_text(strip=True)
+                    
+                    # Extract snippet
+                    snippet = ""
+                    if engine_config['snippet_selector']:
+                        snippet_elem = soup.select_one(engine_config['snippet_selector'])
+                        if snippet_elem:
+                            snippet = snippet_elem.get_text(strip=True)
+                    
+                    results.append({
+                        'url': url,
+                        'title': title,
+                        'snippet': snippet,
+                        'position': i + 1
+                    })
+                    
+                except Exception as e:
+                    self.logger.debug(f"Error parsing result element: {str(e)}")
+                    continue
+            
+        except Exception as e:
+            self.logger.error(f"Error parsing search results: {str(e)}")
+        
+        return {'results': results}
+    
+    def _check_url_in_results(self, target_url: str, results: List[Dict]) -> Dict[str, Any]:
+        """Check if target URL appears in search results"""
+        
+        from urllib.parse import urlparse
+        
+        target_parsed = urlparse(target_url)
+        target_domain = target_parsed.netloc.lower()
+        target_path = target_parsed.path.lower()
+        
+        for result in results:
+            result_parsed = urlparse(result['url'])
+            result_domain = result_parsed.netloc.lower()
+            result_path = result_parsed.path.lower()
+            
+            # Exact match
+            if result['url'] == target_url:
+                return {
+                    'found': True,
+                    'position': result['position'],
+                    'title': result['title'],
+                    'snippet': result['snippet'],
+                    'match_type': 'exact'
+                }
+            
+            # Domain and path match
+            if result_domain == target_domain and result_path == target_path:
+                return {
+                    'found': True,
+                    'position': result['position'],
+                    'title': result['title'],
+                    'snippet': result['snippet'],
+                    'match_type': 'domain_path'
+                }
+        
+        return {'found': False}
+    
+    async def bulk_check_urls(self, urls: List[str], search_engines: List[str] = None, 
+                             batch_size: int = 5) -> Dict[str, Dict[str, List[SERPResult]]]:
+        """Check multiple URLs in batches to avoid rate limiting"""
+        
+        results = {}
+        
+        # Process URLs in batches
+        for i in range(0, len(urls), batch_size):
+            batch = urls[i:i + batch_size]
+            
+            # Create tasks for concurrent processing
+            tasks = []
+            for url in batch:
+                task = self.check_url_indexed(url, search_engines)
+                tasks.append(task)
+            
+            # Execute batch
+            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Process results
+            for j, result in enumerate(batch_results):
+                url = batch[j]
+                if isinstance(result, Exception):
+                    self.logger.error(f"Error checking {url}: {str(result)}")
+                    results[url] = {}
+                else:
+                    results[url] = result
+            
+            # Delay between batches
+            if i + batch_size < len(urls):
                 await asyncio.sleep(random.uniform(10, 20))
-                
-            except Exception as e:
-                self.logger.error(f"Batch check failed for {url}: {str(e)}")
-                results.append({
-                    'url': url,
-                    'indexed_engines': [],
-                    'indexing_score': 0.0,
-                    'error': str(e),
-                    'timestamp': datetime.now().isoformat()
-                })
         
         return results
     
-    def get_indexing_stats(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Generate statistics from indexing check results"""
-        if not results:
-            return {}
+    async def verify_indexing_success(self, urls: List[str], 
+                                    min_engines: int = 2) -> Dict[str, bool]:
+        """Verify if URLs are successfully indexed across minimum number of engines"""
+        
+        all_results = await self.bulk_check_urls(urls)
+        verification_results = {}
+        
+        for url, engine_results in all_results.items():
+            indexed_engines = 0
+            
+            for engine, serp_results in engine_results.items():
+                # Check if URL was found in any query for this engine
+                if any(result.found for result in serp_results):
+                    indexed_engines += 1
+            
+            verification_results[url] = indexed_engines >= min_engines
+        
+        return verification_results
+    
+    def get_indexing_report(self, results: Dict[str, Dict[str, List[SERPResult]]]) -> Dict[str, Any]:
+        """Generate comprehensive indexing report"""
         
         total_urls = len(results)
-        indexed_urls = sum(1 for r in results if r.get('indexing_score', 0) > 0)
-        
-        # Engine-specific stats
+        indexed_urls = 0
         engine_stats = {}
-        for engine in self.search_engines.keys():
-            engine_indexed = sum(1 for r in results if engine in r.get('indexed_engines', []))
-            engine_stats[engine] = {
-                'indexed_count': engine_indexed,
-                'indexing_rate': engine_indexed / total_urls if total_urls > 0 else 0
-            }
         
-        # Average scores
-        avg_score = sum(r.get('indexing_score', 0) for r in results) / total_urls if total_urls > 0 else 0
+        for url, engine_results in results.items():
+            url_indexed = False
+            
+            for engine, serp_results in engine_results.items():
+                if engine not in engine_stats:
+                    engine_stats[engine] = {'total': 0, 'found': 0}
+                
+                engine_stats[engine]['total'] += 1
+                
+                found = any(result.found for result in serp_results)
+                if found:
+                    engine_stats[engine]['found'] += 1
+                    url_indexed = True
+            
+            if url_indexed:
+                indexed_urls += 1
+        
+        # Calculate success rates
+        for engine in engine_stats:
+            total = engine_stats[engine]['total']
+            found = engine_stats[engine]['found']
+            engine_stats[engine]['success_rate'] = (found / total * 100) if total > 0 else 0
+        
+        overall_success_rate = (indexed_urls / total_urls * 100) if total_urls > 0 else 0
         
         return {
-            'total_urls_checked': total_urls,
+            'total_urls': total_urls,
             'indexed_urls': indexed_urls,
-            'overall_indexing_rate': indexed_urls / total_urls if total_urls > 0 else 0,
-            'average_indexing_score': avg_score,
-            'engine_stats': engine_stats,
-            'timestamp': datetime.now().isoformat()
+            'overall_success_rate': overall_success_rate,
+            'engine_statistics': engine_stats,
+            'detailed_results': results
         }

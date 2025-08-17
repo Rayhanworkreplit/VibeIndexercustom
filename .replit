@@ -2,7 +2,7 @@ modules = ["python-3.11", "web", "nodejs-20"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["geckodriver", "openssl", "postgresql", "xcodebuild", "zlib"]
+packages = ["geckodriver", "glibcLocales", "openssl", "postgresql", "xcodebuild", "zlib"]
 
 [deployment]
 deploymentTarget = "autoscale"

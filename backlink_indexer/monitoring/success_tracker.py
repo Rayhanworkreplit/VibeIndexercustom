@@ -1,643 +1,546 @@
 """
-Success tracking and analytics for backlink indexing performance
+Success tracking and analytics for backlink indexing
+Stores metrics in PostgreSQL and provides comprehensive reporting
 """
 
-import asyncio
 import logging
-from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
-from dataclasses import dataclass, field
-import sqlite3
-import json
+from typing import List, Dict, Any, Optional, Tuple
+from sqlalchemy import create_model, Column, Integer, String, Boolean, Float, DateTime, Text, Index
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import func
+from ..models import IndexingResult, IndexingMethod, MethodPerformance
+import os
+
+Base = declarative_base()
 
 
-@dataclass
-class IndexingAttempt:
-    """Data class for tracking individual indexing attempts"""
-    url: str
-    method: str
-    platform: str
-    success: bool
-    timestamp: datetime
-    response_time: float = 0.0
-    error_message: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+class IndexingResultRecord(Base):
+    """SQLAlchemy model for indexing results"""
+    __tablename__ = 'indexing_results'
+    
+    id = Column(Integer, primary_key=True)
+    url = Column(String(2048), nullable=False, index=True)
+    method = Column(String(50), nullable=False, index=True)
+    success = Column(Boolean, nullable=False, index=True)
+    timestamp = Column(DateTime, nullable=False, index=True)
+    response_time = Column(Float, nullable=True)
+    status_code = Column(Integer, nullable=True)
+    error_message = Column(Text, nullable=True)
+    verification_url = Column(String(2048), nullable=True)
+    metadata = Column(Text, nullable=True)  # JSON string
+    
+    # Composite indexes for better query performance
+    __table_args__ = (
+        Index('idx_method_timestamp', 'method', 'timestamp'),
+        Index('idx_success_timestamp', 'success', 'timestamp'),
+        Index('idx_url_method', 'url', 'method'),
+    )
 
 
-@dataclass
-class PerformanceMetrics:
-    """Performance metrics for indexing methods"""
-    method_name: str
-    total_attempts: int = 0
-    successful_attempts: int = 0
-    success_rate: float = 0.0
-    average_response_time: float = 0.0
-    last_24h_attempts: int = 0
-    last_24h_success_rate: float = 0.0
-    platforms_used: List[str] = field(default_factory=list)
+class CampaignRecord(Base):
+    """SQLAlchemy model for indexing campaigns"""
+    __tablename__ = 'indexing_campaigns'
+    
+    id = Column(Integer, primary_key=True)
+    campaign_id = Column(String(100), unique=True, nullable=False, index=True)
+    name = Column(String(200), nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    status = Column(String(50), nullable=False, index=True)
+    total_urls = Column(Integer, nullable=False)
+    processed_urls = Column(Integer, default=0)
+    successful_urls = Column(Integer, default=0)
+    failed_urls = Column(Integer, default=0)
+    progress_percentage = Column(Float, default=0.0)
+    metadata = Column(Text, nullable=True)
+
+
+class MethodPerformanceRecord(Base):
+    """SQLAlchemy model for method performance tracking"""
+    __tablename__ = 'method_performance'
+    
+    id = Column(Integer, primary_key=True)
+    method = Column(String(50), nullable=False, index=True)
+    date = Column(DateTime, nullable=False, index=True)
+    total_attempts = Column(Integer, default=0)
+    successful_attempts = Column(Integer, default=0)
+    failed_attempts = Column(Integer, default=0)
+    average_response_time = Column(Float, default=0.0)
+    success_rate = Column(Float, default=0.0)
+    
+    __table_args__ = (
+        Index('idx_method_date', 'method', 'date'),
+    )
 
 
 class SuccessTracker:
-    """Advanced success tracking and analytics system"""
+    """
+    Comprehensive success tracking and analytics system
+    Provides real-time metrics and historical analysis
+    """
     
-    def __init__(self, config):
-        self.config = config
-        self.setup_logging()
-        self.db_path = getattr(config, 'database_path', 'backlink_analytics.db')
-        self.setup_database()
+    def __init__(self, database_url: str = None):
+        self.database_url = database_url or os.environ.get('DATABASE_URL', 'sqlite:///indexing_analytics.db')
+        self.engine = None
+        self.Session = None
+        self.logger = logging.getLogger(__name__)
         
-        # In-memory cache for recent metrics
-        self.metrics_cache = {}
-        self.cache_ttl = 300  # 5 minutes
-        self.last_cache_update = {}
+        self._initialize_database()
         
-    def setup_logging(self):
-        """Configure logging for success tracking"""
-        self.logger = logging.getLogger(f"{__name__}.SuccessTracker")
+        # Cache for performance metrics
+        self._performance_cache = {}
+        self._cache_expiry = None
     
-    def setup_database(self):
-        """Initialize SQLite database for analytics"""
+    def _initialize_database(self):
+        """Initialize database connection and create tables"""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
+            from sqlalchemy import create_engine
             
-            # Create tables
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS indexing_attempts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    url TEXT NOT NULL,
-                    method TEXT NOT NULL,
-                    platform TEXT NOT NULL,
-                    success BOOLEAN NOT NULL,
-                    timestamp DATETIME NOT NULL,
-                    response_time REAL DEFAULT 0.0,
-                    error_message TEXT DEFAULT '',
-                    metadata TEXT DEFAULT '{}'
-                )
-            ''')
-            
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS daily_summaries (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    date DATE NOT NULL,
-                    method TEXT NOT NULL,
-                    total_attempts INTEGER DEFAULT 0,
-                    successful_attempts INTEGER DEFAULT 0,
-                    success_rate REAL DEFAULT 0.0,
-                    average_response_time REAL DEFAULT 0.0,
-                    platforms_data TEXT DEFAULT '[]',
-                    UNIQUE(date, method)
-                )
-            ''')
-            
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS method_performance (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    method TEXT NOT NULL,
-                    platform TEXT NOT NULL,
-                    success_rate REAL DEFAULT 0.0,
-                    total_attempts INTEGER DEFAULT 0,
-                    last_updated DATETIME NOT NULL,
-                    UNIQUE(method, platform)
-                )
-            ''')
-            
-            # Create indexes for better performance
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_attempts_timestamp ON indexing_attempts(timestamp)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_attempts_method ON indexing_attempts(method)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_attempts_success ON indexing_attempts(success)')
-            
-            conn.commit()
-            conn.close()
-            
-        except Exception as e:
-            self.logger.error(f"Database setup failed: {str(e)}")
-    
-    async def record_attempt(self, attempt: IndexingAttempt):
-        """Record an indexing attempt in the database"""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                INSERT INTO indexing_attempts 
-                (url, method, platform, success, timestamp, response_time, error_message, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                attempt.url,
-                attempt.method,
-                attempt.platform,
-                attempt.success,
-                attempt.timestamp.isoformat(),
-                attempt.response_time,
-                attempt.error_message,
-                json.dumps(attempt.metadata)
-            ))
-            
-            conn.commit()
-            conn.close()
-            
-            # Update daily summary
-            await self.update_daily_summary(attempt)
-            
-            # Clear cache for this method
-            if attempt.method in self.metrics_cache:
-                del self.metrics_cache[attempt.method]
-            
-        except Exception as e:
-            self.logger.error(f"Failed to record attempt: {str(e)}")
-    
-    async def update_daily_summary(self, attempt: IndexingAttempt):
-        """Update daily summary statistics"""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            date_str = attempt.timestamp.date().isoformat()
-            
-            # Get current day's stats
-            cursor.execute('''
-                SELECT total_attempts, successful_attempts, platforms_data
-                FROM daily_summaries 
-                WHERE date = ? AND method = ?
-            ''', (date_str, attempt.method))
-            
-            result = cursor.fetchone()
-            
-            if result:
-                total_attempts, successful_attempts, platforms_data = result
-                platforms = json.loads(platforms_data)
-            else:
-                total_attempts = 0
-                successful_attempts = 0
-                platforms = []
-            
-            # Update counts
-            total_attempts += 1
-            if attempt.success:
-                successful_attempts += 1
-            
-            # Track platforms
-            if attempt.platform not in platforms:
-                platforms.append(attempt.platform)
-            
-            # Calculate success rate
-            success_rate = successful_attempts / total_attempts if total_attempts > 0 else 0.0
-            
-            # Upsert daily summary
-            cursor.execute('''
-                INSERT OR REPLACE INTO daily_summaries 
-                (date, method, total_attempts, successful_attempts, success_rate, platforms_data)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (
-                date_str,
-                attempt.method,
-                total_attempts,
-                successful_attempts,
-                success_rate,
-                json.dumps(platforms)
-            ))
-            
-            conn.commit()
-            conn.close()
-            
-        except Exception as e:
-            self.logger.error(f"Failed to update daily summary: {str(e)}")
-    
-    async def get_method_performance(self, method_name: str, days: int = 7) -> PerformanceMetrics:
-        """Get performance metrics for a specific method"""
-        # Check cache first
-        cache_key = f"{method_name}_{days}"
-        if (cache_key in self.metrics_cache and 
-            cache_key in self.last_cache_update and
-            (datetime.now() - self.last_cache_update[cache_key]).seconds < self.cache_ttl):
-            return self.metrics_cache[cache_key]
-        
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # Get date range
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=days)
-            
-            # Get overall stats
-            cursor.execute('''
-                SELECT 
-                    COUNT(*) as total_attempts,
-                    SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_attempts,
-                    AVG(response_time) as avg_response_time,
-                    GROUP_CONCAT(DISTINCT platform) as platforms
-                FROM indexing_attempts 
-                WHERE method = ? AND timestamp >= ?
-            ''', (method_name, start_date.isoformat()))
-            
-            result = cursor.fetchone()
-            
-            if result and result[0] > 0:
-                total_attempts, successful_attempts, avg_response_time, platforms_str = result
-                success_rate = successful_attempts / total_attempts if total_attempts > 0 else 0.0
-                platforms = platforms_str.split(',') if platforms_str else []
-            else:
-                total_attempts = 0
-                successful_attempts = 0
-                success_rate = 0.0
-                avg_response_time = 0.0
-                platforms = []
-            
-            # Get last 24h stats
-            last_24h_start = datetime.now() - timedelta(hours=24)
-            cursor.execute('''
-                SELECT 
-                    COUNT(*) as total_attempts,
-                    SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_attempts
-                FROM indexing_attempts 
-                WHERE method = ? AND timestamp >= ?
-            ''', (method_name, last_24h_start.isoformat()))
-            
-            last_24h_result = cursor.fetchone()
-            
-            if last_24h_result and last_24h_result[0] > 0:
-                last_24h_attempts, last_24h_successful = last_24h_result
-                last_24h_success_rate = last_24h_successful / last_24h_attempts if last_24h_attempts > 0 else 0.0
-            else:
-                last_24h_attempts = 0
-                last_24h_success_rate = 0.0
-            
-            conn.close()
-            
-            # Create metrics object
-            metrics = PerformanceMetrics(
-                method_name=method_name,
-                total_attempts=total_attempts,
-                successful_attempts=successful_attempts,
-                success_rate=success_rate,
-                average_response_time=avg_response_time or 0.0,
-                last_24h_attempts=last_24h_attempts,
-                last_24h_success_rate=last_24h_success_rate,
-                platforms_used=platforms
+            self.engine = create_engine(
+                self.database_url,
+                pool_recycle=3600,
+                pool_pre_ping=True
             )
             
-            # Cache the result
-            self.metrics_cache[cache_key] = metrics
-            self.last_cache_update[cache_key] = datetime.now()
+            # Create tables
+            Base.metadata.create_all(self.engine)
             
-            return metrics
+            # Create session factory
+            self.Session = sessionmaker(bind=self.engine)
             
-        except Exception as e:
-            self.logger.error(f"Failed to get method performance: {str(e)}")
-            return PerformanceMetrics(method_name=method_name)
-    
-    async def get_overall_performance(self, days: int = 7) -> Dict[str, Any]:
-        """Get overall performance across all methods"""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # Get date range
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=days)
-            
-            # Overall stats
-            cursor.execute('''
-                SELECT 
-                    COUNT(*) as total_attempts,
-                    SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_attempts,
-                    COUNT(DISTINCT method) as methods_used,
-                    COUNT(DISTINCT platform) as platforms_used,
-                    AVG(response_time) as avg_response_time
-                FROM indexing_attempts 
-                WHERE timestamp >= ?
-            ''', (start_date.isoformat(),))
-            
-            overall = cursor.fetchone()
-            
-            # Method breakdown
-            cursor.execute('''
-                SELECT 
-                    method,
-                    COUNT(*) as total_attempts,
-                    SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_attempts,
-                    AVG(response_time) as avg_response_time
-                FROM indexing_attempts 
-                WHERE timestamp >= ?
-                GROUP BY method
-                ORDER BY successful_attempts DESC
-            ''', (start_date.isoformat(),))
-            
-            method_breakdown = cursor.fetchall()
-            
-            # Platform breakdown
-            cursor.execute('''
-                SELECT 
-                    platform,
-                    COUNT(*) as total_attempts,
-                    SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_attempts
-                FROM indexing_attempts 
-                WHERE timestamp >= ?
-                GROUP BY platform
-                ORDER BY successful_attempts DESC
-            ''', (start_date.isoformat(),))
-            
-            platform_breakdown = cursor.fetchall()
-            
-            # Daily trends
-            cursor.execute('''
-                SELECT 
-                    DATE(timestamp) as date,
-                    COUNT(*) as total_attempts,
-                    SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_attempts
-                FROM indexing_attempts 
-                WHERE timestamp >= ?
-                GROUP BY DATE(timestamp)
-                ORDER BY date
-            ''', (start_date.isoformat(),))
-            
-            daily_trends = cursor.fetchall()
-            
-            conn.close()
-            
-            # Format results
-            if overall and overall[0] > 0:
-                total_attempts, successful_attempts, methods_used, platforms_used, avg_response_time = overall
-                overall_success_rate = successful_attempts / total_attempts if total_attempts > 0 else 0.0
-            else:
-                total_attempts = successful_attempts = methods_used = platforms_used = 0
-                overall_success_rate = avg_response_time = 0.0
-            
-            # Format method breakdown
-            methods = []
-            for method_data in method_breakdown:
-                method, attempts, successes, avg_time = method_data
-                methods.append({
-                    'method': method,
-                    'total_attempts': attempts,
-                    'successful_attempts': successes,
-                    'success_rate': successes / attempts if attempts > 0 else 0.0,
-                    'average_response_time': avg_time or 0.0
-                })
-            
-            # Format platform breakdown
-            platforms = []
-            for platform_data in platform_breakdown:
-                platform, attempts, successes = platform_data
-                platforms.append({
-                    'platform': platform,
-                    'total_attempts': attempts,
-                    'successful_attempts': successes,
-                    'success_rate': successes / attempts if attempts > 0 else 0.0
-                })
-            
-            # Format daily trends
-            trends = []
-            for trend_data in daily_trends:
-                date, attempts, successes = trend_data
-                trends.append({
-                    'date': date,
-                    'total_attempts': attempts,
-                    'successful_attempts': successes,
-                    'success_rate': successes / attempts if attempts > 0 else 0.0
-                })
-            
-            return {
-                'overall': {
-                    'total_attempts': total_attempts,
-                    'successful_attempts': successful_attempts,
-                    'success_rate': overall_success_rate,
-                    'methods_used': methods_used,
-                    'platforms_used': platforms_used,
-                    'average_response_time': avg_response_time or 0.0
-                },
-                'method_breakdown': methods,
-                'platform_breakdown': platforms,
-                'daily_trends': trends,
-                'period_days': days,
-                'timestamp': datetime.now().isoformat()
-            }
+            self.logger.info("Database initialized successfully")
             
         except Exception as e:
-            self.logger.error(f"Failed to get overall performance: {str(e)}")
-            return {}
+            self.logger.error(f"Error initializing database: {str(e)}")
+            raise
     
-    async def get_failure_analysis(self, method_name: str = None, days: int = 7) -> Dict[str, Any]:
-        """Analyze failure patterns and common errors"""
+    def record_result(self, result: IndexingResult):
+        """Record an indexing result in the database"""
+        session = self.Session()
+        
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
+            # Convert metadata to JSON string if present
+            metadata_json = None
+            if result.metadata:
+                import json
+                metadata_json = json.dumps(result.metadata)
             
-            # Get date range
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=days)
+            record = IndexingResultRecord(
+                url=result.url,
+                method=result.method.value,
+                success=result.success,
+                timestamp=result.timestamp,
+                response_time=result.response_time,
+                status_code=result.status_code,
+                error_message=result.error_message,
+                verification_url=result.verification_url,
+                metadata=metadata_json
+            )
             
-            # Base query for failures
-            base_query = '''
-                FROM indexing_attempts 
-                WHERE success = 0 AND timestamp >= ?
-            '''
-            params = [start_date.isoformat()]
+            session.add(record)
+            session.commit()
             
-            if method_name:
-                base_query += ' AND method = ?'
-                params.append(method_name)
+            # Update method performance cache
+            self._update_method_performance(result.method, result.success, result.response_time)
             
-            # Error message analysis
-            cursor.execute(f'''
-                SELECT error_message, COUNT(*) as count
-                {base_query}
-                AND error_message != ''
-                GROUP BY error_message
-                ORDER BY count DESC
-                LIMIT 10
-            ''', params)
-            
-            error_messages = cursor.fetchall()
-            
-            # Platform failure rates
-            cursor.execute(f'''
-                SELECT 
-                    platform,
-                    COUNT(*) as failed_attempts,
-                    (SELECT COUNT(*) FROM indexing_attempts ia2 
-                     WHERE ia2.platform = indexing_attempts.platform 
-                     AND ia2.timestamp >= ? {"AND ia2.method = ?" if method_name else ""}) as total_attempts
-                {base_query}
-                GROUP BY platform
-                ORDER BY failed_attempts DESC
-            ''', params + params[:1 + (1 if method_name else 0)])
-            
-            platform_failures = cursor.fetchall()
-            
-            # Time-based failure analysis
-            cursor.execute(f'''
-                SELECT 
-                    strftime('%H', timestamp) as hour,
-                    COUNT(*) as failed_attempts
-                {base_query}
-                GROUP BY strftime('%H', timestamp)
-                ORDER BY hour
-            ''', params)
-            
-            hourly_failures = cursor.fetchall()
-            
-            conn.close()
-            
-            # Format results
-            common_errors = [
-                {'error': error, 'count': count}
-                for error, count in error_messages
-            ]
-            
-            platform_analysis = []
-            for platform, failed, total in platform_failures:
-                failure_rate = failed / total if total > 0 else 0.0
-                platform_analysis.append({
-                    'platform': platform,
-                    'failed_attempts': failed,
-                    'total_attempts': total,
-                    'failure_rate': failure_rate
-                })
-            
-            hourly_analysis = [
-                {'hour': int(hour), 'failed_attempts': count}
-                for hour, count in hourly_failures
-            ]
-            
-            return {
-                'common_errors': common_errors,
-                'platform_analysis': platform_analysis,
-                'hourly_failure_pattern': hourly_analysis,
-                'method': method_name,
-                'period_days': days,
-                'timestamp': datetime.now().isoformat()
-            }
+            self.logger.debug(f"Recorded result for {result.url} using {result.method.value}")
             
         except Exception as e:
-            self.logger.error(f"Failed to analyze failures: {str(e)}")
-            return {}
+            session.rollback()
+            self.logger.error(f"Error recording result: {str(e)}")
+            raise
+        finally:
+            session.close()
     
-    async def get_success_predictions(self, method_name: str) -> Dict[str, Any]:
-        """Predict success rates based on historical data"""
+    def batch_record_results(self, results: List[IndexingResult]):
+        """Record multiple results in a single transaction"""
+        session = self.Session()
+        
         try:
-            # Get recent performance data
-            metrics = await self.get_method_performance(method_name, days=30)
+            records = []
+            for result in results:
+                metadata_json = None
+                if result.metadata:
+                    import json
+                    metadata_json = json.dumps(result.metadata)
+                
+                record = IndexingResultRecord(
+                    url=result.url,
+                    method=result.method.value,
+                    success=result.success,
+                    timestamp=result.timestamp,
+                    response_time=result.response_time,
+                    status_code=result.status_code,
+                    error_message=result.error_message,
+                    verification_url=result.verification_url,
+                    metadata=metadata_json
+                )
+                records.append(record)
             
-            # Simple trend analysis
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
+            session.add_all(records)
+            session.commit()
             
-            # Get daily success rates for trend analysis
-            cursor.execute('''
-                SELECT 
-                    DATE(timestamp) as date,
-                    SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) * 1.0 / COUNT(*) as success_rate
-                FROM indexing_attempts 
-                WHERE method = ? AND timestamp >= date('now', '-30 days')
-                GROUP BY DATE(timestamp)
-                ORDER BY date
-            ''', (method_name,))
+            # Update performance metrics
+            for result in results:
+                self._update_method_performance(result.method, result.success, result.response_time)
             
-            daily_rates = cursor.fetchall()
-            conn.close()
-            
-            if len(daily_rates) < 3:
-                return {
-                    'predicted_success_rate': metrics.success_rate,
-                    'confidence': 'low',
-                    'trend': 'stable',
-                    'recommendation': 'insufficient_data'
-                }
-            
-            # Calculate trend
-            rates = [rate[1] for rate in daily_rates]
-            recent_rates = rates[-7:]  # Last 7 days
-            older_rates = rates[-14:-7] if len(rates) >= 14 else rates[:-7]
-            
-            if older_rates:
-                recent_avg = sum(recent_rates) / len(recent_rates)
-                older_avg = sum(older_rates) / len(older_rates)
-                trend_direction = 'improving' if recent_avg > older_avg else 'declining' if recent_avg < older_avg else 'stable'
-            else:
-                trend_direction = 'stable'
-            
-            # Predict next success rate (simple moving average)
-            predicted_rate = sum(recent_rates) / len(recent_rates) if recent_rates else metrics.success_rate
-            
-            # Confidence based on consistency
-            rate_variance = sum((r - predicted_rate) ** 2 for r in recent_rates) / len(recent_rates) if recent_rates else 0
-            confidence = 'high' if rate_variance < 0.05 else 'medium' if rate_variance < 0.15 else 'low'
-            
-            # Recommendation
-            if predicted_rate > 0.8:
-                recommendation = 'continue_current_strategy'
-            elif predicted_rate > 0.5:
-                recommendation = 'optimize_parameters'
-            else:
-                recommendation = 'review_and_adjust'
-            
-            return {
-                'predicted_success_rate': predicted_rate,
-                'confidence': confidence,
-                'trend': trend_direction,
-                'recommendation': recommendation,
-                'recent_performance': recent_rates,
-                'variance': rate_variance
-            }
+            self.logger.info(f"Recorded {len(results)} results in batch")
             
         except Exception as e:
-            self.logger.error(f"Failed to generate predictions: {str(e)}")
-            return {}
+            session.rollback()
+            self.logger.error(f"Error recording batch results: {str(e)}")
+            raise
+        finally:
+            session.close()
     
-    def export_analytics_data(self, method_name: str = None, days: int = 30) -> str:
-        """Export analytics data to JSON"""
+    def get_historical_data(self, start_date: datetime, end_date: datetime) -> List[IndexingResult]:
+        """Retrieve historical indexing results within date range"""
+        session = self.Session()
+        
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
+            records = session.query(IndexingResultRecord).filter(
+                IndexingResultRecord.timestamp.between(start_date, end_date)
+            ).order_by(IndexingResultRecord.timestamp).all()
             
-            # Get date range
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=days)
+            results = []
+            for record in records:
+                # Parse metadata if present
+                metadata = None
+                if record.metadata:
+                    import json
+                    try:
+                        metadata = json.loads(record.metadata)
+                    except json.JSONDecodeError:
+                        pass
+                
+                result = IndexingResult(
+                    url=record.url,
+                    method=IndexingMethod(record.method),
+                    success=record.success,
+                    timestamp=record.timestamp,
+                    response_time=record.response_time,
+                    status_code=record.status_code,
+                    error_message=record.error_message,
+                    verification_url=record.verification_url,
+                    metadata=metadata
+                )
+                results.append(result)
+            
+            return results
+            
+        except Exception as e:
+            self.logger.error(f"Error retrieving historical data: {str(e)}")
+            return []
+        finally:
+            session.close()
+    
+    def get_method_performance(self, method: IndexingMethod = None, 
+                              days_back: int = 30) -> Dict[str, MethodPerformance]:
+        """Get performance metrics for indexing methods"""
+        
+        # Check cache first
+        cache_key = f"{method}_{days_back}" if method else f"all_{days_back}"
+        if self._cache_expiry and datetime.now() < self._cache_expiry:
+            if cache_key in self._performance_cache:
+                return self._performance_cache[cache_key]
+        
+        session = self.Session()
+        
+        try:
+            start_date = datetime.now() - timedelta(days=days_back)
             
             # Build query
-            query = '''
-                SELECT * FROM indexing_attempts 
-                WHERE timestamp >= ?
-            '''
-            params = [start_date.isoformat()]
+            query = session.query(
+                IndexingResultRecord.method,
+                func.count(IndexingResultRecord.id).label('total_attempts'),
+                func.sum(func.cast(IndexingResultRecord.success, Integer)).label('successful_attempts'),
+                func.avg(IndexingResultRecord.response_time).label('avg_response_time')
+            ).filter(
+                IndexingResultRecord.timestamp >= start_date
+            )
             
-            if method_name:
-                query += ' AND method = ?'
-                params.append(method_name)
+            if method:
+                query = query.filter(IndexingResultRecord.method == method.value)
             
-            query += ' ORDER BY timestamp DESC'
+            results = query.group_by(IndexingResultRecord.method).all()
             
-            cursor.execute(query, params)
-            columns = [description[0] for description in cursor.description]
-            rows = cursor.fetchall()
+            performance_metrics = {}
             
-            conn.close()
+            for row in results:
+                method_enum = IndexingMethod(row.method)
+                total_attempts = row.total_attempts or 0
+                successful_attempts = row.successful_attempts or 0
+                failed_attempts = total_attempts - successful_attempts
+                avg_response_time = row.avg_response_time or 0.0
+                success_rate = (successful_attempts / total_attempts * 100) if total_attempts > 0 else 0.0
+                
+                performance = MethodPerformance(
+                    method=method_enum,
+                    total_attempts=total_attempts,
+                    successful_attempts=successful_attempts,
+                    failed_attempts=failed_attempts,
+                    average_response_time=avg_response_time,
+                    success_rate=success_rate
+                )
+                
+                performance_metrics[method_enum.value] = performance
             
-            # Convert to list of dictionaries
-            data = []
-            for row in rows:
-                record = dict(zip(columns, row))
-                # Parse metadata JSON
-                if record['metadata']:
-                    try:
-                        record['metadata'] = json.loads(record['metadata'])
-                    except:
-                        record['metadata'] = {}
-                data.append(record)
+            # Cache results
+            self._performance_cache[cache_key] = performance_metrics
+            self._cache_expiry = datetime.now() + timedelta(minutes=15)  # Cache for 15 minutes
             
-            export_data = {
-                'export_timestamp': datetime.now().isoformat(),
-                'method_filter': method_name,
-                'period_days': days,
-                'total_records': len(data),
-                'data': data
-            }
-            
-            return json.dumps(export_data, indent=2, default=str)
+            return performance_metrics
             
         except Exception as e:
-            self.logger.error(f"Failed to export data: {str(e)}")
-            return json.dumps({'error': str(e)})
+            self.logger.error(f"Error getting method performance: {str(e)}")
+            return {}
+        finally:
+            session.close()
+    
+    def _update_method_performance(self, method: IndexingMethod, success: bool, response_time: float):
+        """Update cached method performance metrics"""
+        # This is a simple in-memory cache update
+        # In production, you might want to use Redis or similar
+        pass
+    
+    def get_success_rates_by_timeframe(self, timeframe: str = 'daily', days_back: int = 30) -> Dict[str, Any]:
+        """Get success rates aggregated by timeframe (daily, hourly)"""
+        session = self.Session()
+        
+        try:
+            start_date = datetime.now() - timedelta(days=days_back)
+            
+            if timeframe == 'daily':
+                date_format = func.date(IndexingResultRecord.timestamp)
+            elif timeframe == 'hourly':
+                date_format = func.date_trunc('hour', IndexingResultRecord.timestamp)
+            else:
+                raise ValueError("Timeframe must be 'daily' or 'hourly'")
+            
+            results = session.query(
+                date_format.label('period'),
+                IndexingResultRecord.method,
+                func.count(IndexingResultRecord.id).label('total'),
+                func.sum(func.cast(IndexingResultRecord.success, Integer)).label('successful')
+            ).filter(
+                IndexingResultRecord.timestamp >= start_date
+            ).group_by(
+                date_format, IndexingResultRecord.method
+            ).order_by(date_format).all()
+            
+            # Process results
+            timeframe_data = {}
+            for row in results:
+                period = row.period.isoformat() if hasattr(row.period, 'isoformat') else str(row.period)
+                method = row.method
+                total = row.total
+                successful = row.successful or 0
+                success_rate = (successful / total * 100) if total > 0 else 0.0
+                
+                if period not in timeframe_data:
+                    timeframe_data[period] = {}
+                
+                timeframe_data[period][method] = {
+                    'total': total,
+                    'successful': successful,
+                    'success_rate': success_rate
+                }
+            
+            return timeframe_data
+            
+        except Exception as e:
+            self.logger.error(f"Error getting success rates by timeframe: {str(e)}")
+            return {}
+        finally:
+            session.close()
+    
+    def get_analytics_dashboard_data(self) -> Dict[str, Any]:
+        """Get comprehensive analytics data for dashboard"""
+        
+        session = self.Session()
+        
+        try:
+            # Overall statistics (last 30 days)
+            thirty_days_ago = datetime.now() - timedelta(days=30)
+            
+            overall_stats = session.query(
+                func.count(IndexingResultRecord.id).label('total_attempts'),
+                func.sum(func.cast(IndexingResultRecord.success, Integer)).label('successful_attempts'),
+                func.avg(IndexingResultRecord.response_time).label('avg_response_time'),
+                func.count(func.distinct(IndexingResultRecord.url)).label('unique_urls')
+            ).filter(
+                IndexingResultRecord.timestamp >= thirty_days_ago
+            ).first()
+            
+            total_attempts = overall_stats.total_attempts or 0
+            successful_attempts = overall_stats.successful_attempts or 0
+            overall_success_rate = (successful_attempts / total_attempts * 100) if total_attempts > 0 else 0.0
+            
+            # Method performance
+            method_performance = self.get_method_performance(days_back=30)
+            
+            # Recent trends (last 7 days)
+            recent_trends = self.get_success_rates_by_timeframe('daily', 7)
+            
+            # Top performing URLs
+            top_urls = session.query(
+                IndexingResultRecord.url,
+                func.count(IndexingResultRecord.id).label('attempts'),
+                func.sum(func.cast(IndexingResultRecord.success, Integer)).label('successes')
+            ).filter(
+                IndexingResultRecord.timestamp >= thirty_days_ago,
+                IndexingResultRecord.success == True
+            ).group_by(
+                IndexingResultRecord.url
+            ).order_by(
+                func.count(IndexingResultRecord.id).desc()
+            ).limit(10).all()
+            
+            # Error analysis
+            error_analysis = session.query(
+                IndexingResultRecord.error_message,
+                func.count(IndexingResultRecord.id).label('count')
+            ).filter(
+                IndexingResultRecord.timestamp >= thirty_days_ago,
+                IndexingResultRecord.success == False,
+                IndexingResultRecord.error_message.isnot(None)
+            ).group_by(
+                IndexingResultRecord.error_message
+            ).order_by(
+                func.count(IndexingResultRecord.id).desc()
+            ).limit(10).all()
+            
+            dashboard_data = {
+                'overview': {
+                    'total_attempts': total_attempts,
+                    'successful_attempts': successful_attempts,
+                    'overall_success_rate': overall_success_rate,
+                    'unique_urls': overall_stats.unique_urls or 0,
+                    'avg_response_time': overall_stats.avg_response_time or 0.0
+                },
+                'method_performance': {
+                    method: {
+                        'success_rate': perf.success_rate,
+                        'total_attempts': perf.total_attempts,
+                        'avg_response_time': perf.average_response_time
+                    }
+                    for method, perf in method_performance.items()
+                },
+                'recent_trends': recent_trends,
+                'top_performing_urls': [
+                    {
+                        'url': row.url,
+                        'attempts': row.attempts,
+                        'successes': row.successes,
+                        'success_rate': (row.successes / row.attempts * 100) if row.attempts > 0 else 0
+                    }
+                    for row in top_urls
+                ],
+                'error_analysis': [
+                    {
+                        'error_message': row.error_message[:100] + '...' if len(row.error_message or '') > 100 else row.error_message,
+                        'count': row.count
+                    }
+                    for row in error_analysis
+                ]
+            }
+            
+            return dashboard_data
+            
+        except Exception as e:
+            self.logger.error(f"Error getting dashboard data: {str(e)}")
+            return {}
+        finally:
+            session.close()
+    
+    def cleanup_old_data(self, days_to_keep: int = 90):
+        """Clean up old tracking data to manage database size"""
+        session = self.Session()
+        
+        try:
+            cutoff_date = datetime.now() - timedelta(days=days_to_keep)
+            
+            # Delete old results
+            deleted_count = session.query(IndexingResultRecord).filter(
+                IndexingResultRecord.timestamp < cutoff_date
+            ).delete()
+            
+            # Delete old performance records
+            session.query(MethodPerformanceRecord).filter(
+                MethodPerformanceRecord.date < cutoff_date
+            ).delete()
+            
+            session.commit()
+            
+            self.logger.info(f"Cleaned up {deleted_count} old tracking records")
+            
+        except Exception as e:
+            session.rollback()
+            self.logger.error(f"Error cleaning up old data: {str(e)}")
+        finally:
+            session.close()
+    
+    def export_data(self, start_date: datetime, end_date: datetime, 
+                   format: str = 'csv') -> str:
+        """Export tracking data in specified format"""
+        
+        results = self.get_historical_data(start_date, end_date)
+        
+        if format == 'csv':
+            return self._export_to_csv(results)
+        elif format == 'json':
+            return self._export_to_json(results)
+        else:
+            raise ValueError("Supported formats: csv, json")
+    
+    def _export_to_csv(self, results: List[IndexingResult]) -> str:
+        """Export results to CSV format"""
+        import csv
+        import io
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
+        writer.writerow([
+            'URL', 'Method', 'Success', 'Timestamp', 'Response Time',
+            'Status Code', 'Error Message', 'Verification URL'
+        ])
+        
+        # Write data
+        for result in results:
+            writer.writerow([
+                result.url,
+                result.method.value,
+                result.success,
+                result.timestamp.isoformat(),
+                result.response_time,
+                result.status_code,
+                result.error_message,
+                result.verification_url
+            ])
+        
+        return output.getvalue()
+    
+    def _export_to_json(self, results: List[IndexingResult]) -> str:
+        """Export results to JSON format"""
+        import json
+        
+        data = []
+        for result in results:
+            data.append({
+                'url': result.url,
+                'method': result.method.value,
+                'success': result.success,
+                'timestamp': result.timestamp.isoformat(),
+                'response_time': result.response_time,
+                'status_code': result.status_code,
+                'error_message': result.error_message,
+                'verification_url': result.verification_url,
+                'metadata': result.metadata
+            })
+        
+        return json.dumps(data, indent=2)
