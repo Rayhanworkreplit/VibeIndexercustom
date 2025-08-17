@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Server Error - Google Indexing Pipeline{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6 text-center">
+            <div class="py-5">
+                <i class="fas fa-exclamation-circle fa-5x text-danger mb-4"></i>
+                <h1 class="display-4">500</h1>
+                <h2 class="mb-4">Server Error</h2>
+                <p class="lead text-muted mb-4">
+                    Something went wrong on our end. We're working to fix this issue.
+                </p>
+                
+                <div class="alert alert-info text-start">
+                    <h6><i class="fas fa-info-circle me-1"></i>What you can do:</h6>
+                    <ul class="mb-0">
+                        <li>Try refreshing the page</li>
+                        <li>Check if the issue persists</li>
+                        <li>Go back to the previous page</li>
+                        <li>Visit the dashboard</li>
+                    </ul>
+                </div>
+                
+                <div class="d-flex flex-column flex-sm-row justify-content-center gap-2 mt-4">
+                    <button type="button" class="btn btn-primary" onclick="window.location.reload()">
+                        <i class="fas fa-sync me-1"></i>
+                        Refresh Page
+                    </button>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-home me-1"></i>
+                        Go to Dashboard
+                    </a>
+                    <button type="button" class="btn btn-outline-secondary" onclick="history.back()">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Go Back
+                    </button>
+                </div>
+                
+                <hr class="my-4">
+                
+                <div class="text-start">
+                    <h6>System Status:</h6>
+                    <div class="small text-muted">
+                        <p>If this error persists, please check:</p>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-database me-1"></i> Database connectivity</li>
+                            <li><i class="fas fa-key me-1"></i> API credentials (GSC)</li>
+                            <li><i class="fas fa-cog me-1"></i> Application configuration</li>
+                            <li><i class="fas fa-server me-1"></i> Server resources</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

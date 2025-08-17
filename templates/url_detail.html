@@ -1,0 +1,426 @@
+{% extends "base.html" %}
+
+{% block title %}{{ url.url|truncate(50) }} - URL Details{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-start mb-4">
+            <div>
+                <h1>
+                    <i class="fas fa-link me-2"></i>
+                    URL Details
+                </h1>
+                <p class="text-muted mb-0">{{ url.url }}</p>
+            </div>
+            <div>
+                <a href="{{ url_for('urls') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>
+                    Back to URLs
+                </a>
+                <a href="{{ url.url }}" target="_blank" class="btn btn-outline-primary">
+                    <i class="fas fa-external-link-alt me-1"></i>
+                    Visit URL
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- URL Overview -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle me-2"></i>Overview</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <dl class="row">
+                            <dt class="col-sm-4">Status:</dt>
+                            <dd class="col-sm-8">
+                                {% if url.status == 'indexed' %}
+                                    <span class="badge bg-success">Indexed</span>
+                                {% elif url.status == 'ready' %}
+                                    <span class="badge bg-info">Ready</span>
+                                {% elif url.status == 'pending' %}
+                                    <span class="badge bg-warning">Pending</span>
+                                {% elif url.status == 'error' %}
+                                    <span class="badge bg-danger">Error</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ url.status|title }}</span>
+                                {% endif %}
+                            </dd>
+                            
+                            <dt class="col-sm-4">Priority:</dt>
+                            <dd class="col-sm-8">{{ url.priority }}</dd>
+                            
+                            <dt class="col-sm-4">Change Freq:</dt>
+                            <dd class="col-sm-8">{{ url.changefreq|title }}</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-6">
+                        <dl class="row">
+                            <dt class="col-sm-5">Created:</dt>
+                            <dd class="col-sm-7">{{ url.created_at.strftime('%m/%d/%Y %H:%M') }}</dd>
+                            
+                            <dt class="col-sm-5">Last Checked:</dt>
+                            <dd class="col-sm-7">
+                                {% if url.last_checked %}
+                                    {{ url.last_checked.strftime('%m/%d/%Y %H:%M') }}
+                                {% else %}
+                                    <span class="text-muted">Never</span>
+                                {% endif %}
+                            </dd>
+                            
+                            <dt class="col-sm-5">Last Indexed:</dt>
+                            <dd class="col-sm-7">
+                                {% if url.last_indexed %}
+                                    {{ url.last_indexed.strftime('%m/%d/%Y %H:%M') }}
+                                {% else %}
+                                    <span class="text-muted">Not indexed</span>
+                                {% endif %}
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+                
+                {% if url.title %}
+                    <hr>
+                    <h6>Title</h6>
+                    <p>{{ url.title }}</p>
+                {% endif %}
+                
+                {% if url.meta_description %}
+                    <h6>Meta Description</h6>
+                    <p class="text-muted">{{ url.meta_description }}</p>
+                {% endif %}
+                
+                {% if url.last_error %}
+                    <hr>
+                    <h6 class="text-danger">Last Error</h6>
+                    <div class="alert alert-danger">
+                        {{ url.last_error }}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-bar me-2"></i>Quick Stats</h5>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-3">
+                    <h3 class="text-primary">{{ crawl_history|length }}</h3>
+                    <p class="small text-muted mb-0">Total Crawls</p>
+                </div>
+                
+                {% if url.latest_crawl %}
+                    <hr>
+                    <dl class="row small">
+                        <dt class="col-6">Last Status:</dt>
+                        <dd class="col-6">
+                            {% if url.latest_crawl.status_code == 200 %}
+                                <span class="badge bg-success">{{ url.latest_crawl.status_code }}</span>
+                            {% else %}
+                                <span class="badge bg-danger">{{ url.latest_crawl.status_code or 'Error' }}</span>
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-6">Response Time:</dt>
+                        <dd class="col-6">
+                            {% if url.latest_crawl.response_time %}
+                                {{ "%.2f"|format(url.latest_crawl.response_time) }}s
+                            {% else %}
+                                -
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-6">Content Size:</dt>
+                        <dd class="col-6">
+                            {% if url.latest_crawl.content_length %}
+                                {{ "%.1f"|format(url.latest_crawl.content_length / 1024) }} KB
+                            {% else %}
+                                -
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-6">Word Count:</dt>
+                        <dd class="col-6">{{ url.latest_crawl.word_count or '-' }}</dd>
+                    </dl>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="fas fa-cogs me-2"></i>Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="revalidateUrl({{ url.id }})">
+                        <i class="fas fa-sync me-1"></i>
+                        Re-validate
+                    </button>
+                    
+                    {% if url.status == 'ready' %}
+                        <button type="button" class="btn btn-success btn-sm" onclick="addToSitemap({{ url.id }})">
+                            <i class="fas fa-sitemap me-1"></i>
+                            Add to Sitemap
+                        </button>
+                    {% endif %}
+                    
+                    <button type="button" class="btn btn-danger btn-sm" 
+                            onclick="deleteUrl({{ url.id }}, '{{ url.url|truncate(30) }}')">
+                        <i class="fas fa-trash me-1"></i>
+                        Delete URL
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- GSC Feedback -->
+{% if gsc_feedback %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fab fa-google me-2"></i>Google Search Console Feedback</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <dl class="row">
+                            <dt class="col-sm-4">Index Status:</dt>
+                            <dd class="col-sm-8">
+                                {% if gsc_feedback.index_status == 'PASS' %}
+                                    <span class="badge bg-success">{{ gsc_feedback.index_status }}</span>
+                                {% elif gsc_feedback.index_status == 'FAIL' %}
+                                    <span class="badge bg-danger">{{ gsc_feedback.index_status }}</span>
+                                {% else %}
+                                    <span class="badge bg-warning">{{ gsc_feedback.index_status or 'Unknown' }}</span>
+                                {% endif %}
+                            </dd>
+                            
+                            <dt class="col-sm-4">Coverage:</dt>
+                            <dd class="col-sm-8">{{ gsc_feedback.coverage_state or 'Unknown' }}</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-6">
+                        <dl class="row">
+                            <dt class="col-sm-5">Last Crawled:</dt>
+                            <dd class="col-sm-7">
+                                {% if gsc_feedback.last_crawled %}
+                                    {{ gsc_feedback.last_crawled.strftime('%m/%d/%Y %H:%M') }}
+                                {% else %}
+                                    <span class="text-muted">Unknown</span>
+                                {% endif %}
+                            </dd>
+                            
+                            <dt class="col-sm-5">Updated:</dt>
+                            <dd class="col-sm-7">{{ gsc_feedback.updated_at.strftime('%m/%d/%Y %H:%M') }}</dd>
+                        </dl>
+                    </div>
+                </div>
+                
+                {% if gsc_feedback.blocking_issue %}
+                    <hr>
+                    <h6 class="text-danger">Blocking Issue</h6>
+                    <div class="alert alert-danger">
+                        {{ gsc_feedback.blocking_issue }}
+                    </div>
+                {% endif %}
+                
+                {% if gsc_feedback.warning_issue %}
+                    <h6 class="text-warning">Warning</h6>
+                    <div class="alert alert-warning">
+                        {{ gsc_feedback.warning_issue }}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Crawl History -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-history me-2"></i>Crawl History</h5>
+            </div>
+            <div class="card-body">
+                {% if crawl_history %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                    <th>Response Time</th>
+                                    <th>Size</th>
+                                    <th>Words</th>
+                                    <th>Robots</th>
+                                    <th>Canonical</th>
+                                    <th>Issues</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for crawl in crawl_history %}
+                                <tr>
+                                    <td>
+                                        <small>{{ crawl.created_at.strftime('%m/%d %H:%M') }}</small>
+                                    </td>
+                                    <td>
+                                        {% if crawl.status_code == 200 %}
+                                            <span class="badge bg-success">{{ crawl.status_code }}</span>
+                                        {% elif crawl.status_code %}
+                                            <span class="badge bg-danger">{{ crawl.status_code }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Error</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if crawl.response_time %}
+                                            {{ "%.2f"|format(crawl.response_time) }}s
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if crawl.content_length %}
+                                            {{ "%.1f"|format(crawl.content_length / 1024) }} KB
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ crawl.word_count or '-' }}</td>
+                                    <td>
+                                        {% if crawl.robots_allowed == True %}
+                                            <i class="fas fa-check text-success"></i>
+                                        {% elif crawl.robots_allowed == False %}
+                                            <i class="fas fa-times text-danger"></i>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if crawl.canonical_ok == True %}
+                                            <i class="fas fa-check text-success"></i>
+                                        {% elif crawl.canonical_ok == False %}
+                                            <i class="fas fa-times text-danger"></i>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if crawl.validation_errors %}
+                                            <span class="text-danger" title="{{ crawl.validation_errors }}">
+                                                <i class="fas fa-exclamation-triangle"></i>
+                                            </span>
+                                        {% else %}
+                                            <i class="fas fa-check text-success"></i>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-history fa-2x text-muted mb-3"></i>
+                        <h6>No Crawl History</h6>
+                        <p class="text-muted">This URL hasn't been crawled yet.</p>
+                        <button type="button" class="btn btn-primary" onclick="revalidateUrl({{ url.id }})">
+                            <i class="fas fa-sync me-1"></i>
+                            Start Validation
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Re-validate URL
+    async function revalidateUrl(urlId) {
+        const button = document.querySelector('button[onclick="revalidateUrl(' + urlId + ')"]');
+        const originalText = button.innerHTML;
+        
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Validating...';
+        button.disabled = true;
+        
+        try {
+            const response = await fetch('/api/process-tasks', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task_type: 'validate_url', url_id: urlId })
+            });
+            
+            if (response.ok) {
+                showToast('Validation queued successfully', 'success');
+                setTimeout(() => window.location.reload(), 2000);
+            } else {
+                showToast('Error queuing validation', 'error');
+            }
+        } catch (error) {
+            showToast('Error queuing validation', 'error');
+        } finally {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
+    }
+    
+    // Add to sitemap
+    async function addToSitemap(urlId) {
+        const button = document.querySelector('button[onclick="addToSitemap(' + urlId + ')"]');
+        const originalText = button.innerHTML;
+        
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Adding...';
+        button.disabled = true;
+        
+        try {
+            const response = await fetch('/api/process-tasks', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task_type: 'generate_sitemap', url_ids: [urlId] })
+            });
+            
+            if (response.ok) {
+                showToast('Sitemap generation queued', 'success');
+            } else {
+                showToast('Error queuing sitemap generation', 'error');
+            }
+        } catch (error) {
+            showToast('Error queuing sitemap generation', 'error');
+        } finally {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
+    }
+    
+    // Delete URL
+    function deleteUrl(urlId, urlText) {
+        if (confirm(`Are you sure you want to delete this URL?\n\n${urlText}`)) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/delete-url/${urlId}`;
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+</script>
+{% endblock %}

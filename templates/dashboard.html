@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Google Indexing Pipeline{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-tachometer-alt me-2"></i>
+            Indexing Dashboard
+        </h1>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="text-primary">{{ stats.total_urls }}</h3>
+                <p class="small text-muted mb-0">Total URLs</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="text-success">{{ stats.indexed_urls }}</h3>
+                <p class="small text-muted mb-0">Indexed</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="text-info">{{ stats.ready_urls }}</h3>
+                <p class="small text-muted mb-0">Ready</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="text-warning">{{ stats.pending_urls }}</h3>
+                <p class="small text-muted mb-0">Pending</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="text-danger">{{ stats.error_urls }}</h3>
+                <p class="small text-muted mb-0">Errors</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <h3 class="text-success">{{ stats.indexing_rate }}%</h3>
+                <p class="small text-muted mb-0">Index Rate</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts and Analytics -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-line me-2"></i>Daily Indexing Trends</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="indexingChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-pie me-2"></i>URL Status Distribution</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="statusChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-bolt me-2"></i>Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <form method="POST" action="{{ url_for('validate_urls') }}" class="d-inline">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-search me-1"></i>
+                                Validate Pending URLs
+                            </button>
+                        </form>
+                    </div>
+                    <div class="col-md-3">
+                        <form method="POST" action="{{ url_for('generate_sitemap') }}" class="d-inline">
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="fas fa-sitemap me-1"></i>
+                                Generate Sitemap
+                            </button>
+                        </form>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-info w-100" onclick="harvestGSCFeedback()">
+                            <i class="fas fa-download me-1"></i>
+                            Harvest GSC Data
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="{{ url_for('urls') }}" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-plus me-1"></i>
+                            Add URLs
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity and Errors -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-history me-2"></i>Recent Crawl Activity</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_crawls %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>URL</th>
+                                    <th>Status</th>
+                                    <th>Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for crawl in recent_crawls %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('url_detail', url_id=crawl.url_id) }}" class="text-decoration-none">
+                                            {{ crawl.url.url|truncate(50) }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {% if crawl.status_code == 200 %}
+                                            <span class="badge bg-success">{{ crawl.status_code }}</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">{{ crawl.status_code or 'Error' }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ crawl.created_at.strftime('%m/%d %H:%M') }}
+                                        </small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No recent crawl activity</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-exclamation-triangle me-2"></i>Common Issues</h5>
+            </div>
+            <div class="card-body">
+                {% if error_summary %}
+                    {% for error, count in error_summary %}
+                        {% if error %}
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="small">{{ error[:50] }}...</span>
+                                <span class="badge bg-danger">{{ count }}</span>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted">No common issues found</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Sitemaps -->
+{% if recent_sitemaps %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-sitemap me-2"></i>Recent Sitemaps</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Filename</th>
+                                <th>URLs</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Submitted</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sitemap in recent_sitemaps %}
+                            <tr>
+                                <td>{{ sitemap.filename }}</td>
+                                <td>{{ sitemap.url_count }}</td>
+                                <td>
+                                    {% if sitemap.submission_status == 'submitted' %}
+                                        <span class="badge bg-success">Submitted</span>
+                                    {% elif sitemap.submission_status == 'pending' %}
+                                        <span class="badge bg-warning">Pending</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ sitemap.submission_status|title }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ sitemap.created_at.strftime('%m/%d %H:%M') }}
+                                    </small>
+                                </td>
+                                <td>
+                                    {% if sitemap.submitted_at %}
+                                        <small class="text-muted">
+                                            {{ sitemap.submitted_at.strftime('%m/%d %H:%M') }}
+                                        </small>
+                                    {% else %}
+                                        <small class="text-muted">-</small>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Prepare data for charts
+    const dailyStats = {{ daily_stats|tojson|safe }};
+    
+    // Status distribution chart
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    new Chart(statusCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Indexed', 'Ready', 'Pending', 'Error'],
+            datasets: [{
+                data: [
+                    {{ stats.indexed_urls }},
+                    {{ stats.ready_urls }},
+                    {{ stats.pending_urls }},
+                    {{ stats.error_urls }}
+                ],
+                backgroundColor: [
+                    'var(--bs-success)',
+                    'var(--bs-info)',
+                    'var(--bs-warning)',
+                    'var(--bs-danger)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+    
+    // Daily trends chart
+    const indexingCtx = document.getElementById('indexingChart').getContext('2d');
+    const dates = dailyStats.map(stat => stat.date);
+    const totalUrls = dailyStats.map(stat => stat.total_urls || 0);
+    const indexedUrls = dailyStats.map(stat => stat.indexed_urls || 0);
+    
+    new Chart(indexingCtx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: 'Total URLs',
+                data: totalUrls,
+                borderColor: 'var(--bs-primary)',
+                backgroundColor: 'transparent',
+                tension: 0.4
+            }, {
+                label: 'Indexed URLs',
+                data: indexedUrls,
+                borderColor: 'var(--bs-success)',
+                backgroundColor: 'transparent',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+    
+    // Harvest GSC feedback function
+    async function harvestGSCFeedback() {
+        const button = document.querySelector('button[onclick="harvestGSCFeedback()"]');
+        const originalText = button.innerHTML;
+        
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Harvesting...';
+        button.disabled = true;
+        
+        try {
+            // Queue GSC harvest task
+            const response = await fetch('/api/process-tasks', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task_type: 'harvest_gsc' })
+            });
+            
+            if (response.ok) {
+                showToast('GSC feedback harvest queued', 'success');
+            } else {
+                showToast('Error queuing GSC harvest', 'error');
+            }
+        } catch (error) {
+            showToast('Error queuing GSC harvest', 'error');
+        } finally {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
+    }
+    
+    // Auto-refresh stats every 30 seconds
+    setInterval(async () => {
+        try {
+            const response = await fetch('/api/stats');
+            const data = await response.json();
+            
+            // Update stat cards
+            const cards = document.querySelectorAll('.card-body h3');
+            if (cards.length >= 5) {
+                cards[0].textContent = data.total_urls;
+                cards[1].textContent = data.indexed_urls;
+                cards[2].textContent = data.ready_urls;
+                cards[3].textContent = data.pending_urls;
+                cards[4].textContent = data.error_urls;
+                cards[5].textContent = data.indexing_rate + '%';
+            }
+        } catch (error) {
+            console.warn('Failed to refresh stats:', error);
+        }
+    }, 30000);
+</script>
+{% endblock %}

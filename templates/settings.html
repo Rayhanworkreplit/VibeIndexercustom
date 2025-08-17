@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Google Indexing Pipeline{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-cog me-2"></i>
+            Application Settings
+        </h1>
+    </div>
+</div>
+
+<form method="POST" action="{{ url_for('update_settings') }}">
+    <div class="row">
+        <!-- Site Configuration -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-globe me-2"></i>Site Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="site_url" class="form-label">Site URL</label>
+                        <input type="url" class="form-control" id="site_url" name="site_url" 
+                               value="{{ settings.site_url }}" required>
+                        <div class="form-text">The base URL of your website (e.g., https://example.com)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="gsc_property_url" class="form-label">Google Search Console Property URL</label>
+                        <input type="url" class="form-control" id="gsc_property_url" name="gsc_property_url" 
+                               value="{{ settings.gsc_property_url }}" required>
+                        <div class="form-text">The property URL configured in Google Search Console</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Crawling Settings -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-spider me-2"></i>Crawling Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="max_crawl_rate" class="form-label">Max Crawl Rate (URLs per hour)</label>
+                        <input type="number" class="form-control" id="max_crawl_rate" name="max_crawl_rate" 
+                               value="{{ settings.max_crawl_rate }}" min="1" max="1000">
+                        <div class="form-text">Maximum number of URLs to crawl per hour</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="crawl_delay" class="form-label">Crawl Delay (seconds)</label>
+                        <input type="number" class="form-control" id="crawl_delay" name="crawl_delay" 
+                               value="{{ settings.crawl_delay }}" min="0.1" max="60" step="0.1">
+                        <div class="form-text">Delay between requests to avoid overwhelming servers</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Sitemap Settings -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-sitemap me-2"></i>Sitemap Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="sitemap_max_urls" class="form-label">Max URLs per Sitemap</label>
+                        <input type="number" class="form-control" id="sitemap_max_urls" name="sitemap_max_urls" 
+                               value="{{ settings.sitemap_max_urls }}" min="1" max="50000">
+                        <div class="form-text">Maximum number of URLs to include in a single sitemap file</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="auto_submit_sitemaps" 
+                                   name="auto_submit_sitemaps" {% if settings.auto_submit_sitemaps %}checked{% endif %}>
+                            <label class="form-check-label" for="auto_submit_sitemaps">
+                                Auto-submit sitemaps to Google Search Console
+                            </label>
+                        </div>
+                        <div class="form-text">Automatically submit generated sitemaps to GSC</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Notification Settings -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-bell me-2"></i>Notification Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="slack_webhook_url" class="form-label">Slack Webhook URL (Optional)</label>
+                        <input type="url" class="form-control" id="slack_webhook_url" name="slack_webhook_url" 
+                               value="{{ settings.slack_webhook_url or '' }}" placeholder="https://hooks.slack.com/...">
+                        <div class="form-text">Slack webhook URL for notifications</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email_alerts" class="form-label">Email Alerts (Optional)</label>
+                        <input type="email" class="form-control" id="email_alerts" name="email_alerts" 
+                               value="{{ settings.email_alerts or '' }}" placeholder="admin@example.com">
+                        <div class="form-text">Email address for alerts and notifications</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="alert_on_deindex" 
+                                   name="alert_on_deindex" {% if settings.alert_on_deindex %}checked{% endif %}>
+                            <label class="form-check-label" for="alert_on_deindex">
+                                Alert when pages are de-indexed
+                            </label>
+                        </div>
+                        <div class="form-text">Send notifications when indexed pages become de-indexed</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- GSC Integration Status -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fab fa-google me-2"></i>Google Search Console Integration</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Service Account Status</h6>
+                            <div id="gsc-status" class="mb-3">
+                                <span class="badge bg-warning">Checking...</span>
+                            </div>
+                            
+                            <h6>Required Setup</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check-circle text-success me-1"></i> Create Google Cloud Project</li>
+                                <li><i class="fas fa-check-circle text-success me-1"></i> Enable Search Console API</li>
+                                <li><i class="fas fa-check-circle text-success me-1"></i> Create Service Account</li>
+                                <li><i class="fas fa-check-circle text-success me-1"></i> Download Service Account JSON</li>
+                                <li><i class="fas fa-clock text-warning me-1"></i> Add Service Account to GSC Property</li>
+                                <li><i class="fas fa-clock text-warning me-1"></i> Set GSC_SERVICE_ACCOUNT_JSON environment variable</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Environment Variables</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <tbody>
+                                        <tr>
+                                            <td><code>GSC_SERVICE_ACCOUNT_JSON</code></td>
+                                            <td>
+                                                <span id="gsc-env-status" class="badge bg-warning">Checking...</span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>DATABASE_URL</code></td>
+                                            <td>
+                                                <span class="badge bg-success">Set</span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>SESSION_SECRET</code></td>
+                                            <td>
+                                                <span class="badge bg-success">Set</span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="alert alert-info">
+                                <small>
+                                    <strong>Note:</strong> GSC integration requires proper service account setup. 
+                                    Without it, sitemap submission and feedback harvesting will be disabled.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- System Information -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-info-circle me-2"></i>System Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <dl class="row">
+                                <dt class="col-sm-4">Application:</dt>
+                                <dd class="col-sm-8">Google Indexing Pipeline v1.0</dd>
+                                
+                                <dt class="col-sm-4">Framework:</dt>
+                                <dd class="col-sm-8">Flask with SQLAlchemy</dd>
+                                
+                                <dt class="col-sm-4">Database:</dt>
+                                <dd class="col-sm-8">SQLite (indexer.db)</dd>
+                            </dl>
+                        </div>
+                        <div class="col-md-6">
+                            <dl class="row">
+                                <dt class="col-sm-4">Sitemap Directory:</dt>
+                                <dd class="col-sm-8"><code>./sitemaps/</code></dd>
+                                
+                                <dt class="col-sm-4">Last Updated:</dt>
+                                <dd class="col-sm-8">{{ settings.updated_at.strftime('%m/%d/%Y %H:%M') if settings.updated_at else 'Never' }}</dd>
+                                
+                                <dt class="col-sm-4">Configuration:</dt>
+                                <dd class="col-sm-8">
+                                    <span class="badge bg-success">Active</span>
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Submit Button -->
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-end">
+                <button type="button" class="btn btn-secondary me-2" onclick="window.location.reload()">
+                    <i class="fas fa-undo me-1"></i>
+                    Reset
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-1"></i>
+                    Save Settings
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Check GSC integration status
+    async function checkGSCStatus() {
+        try {
+            const response = await fetch('/api/gsc-status');
+            const data = await response.json();
+            
+            const statusBadge = document.getElementById('gsc-status');
+            const envBadge = document.getElementById('gsc-env-status');
+            
+            if (data.credentials_available) {
+                statusBadge.innerHTML = '<span class="badge bg-success">Connected</span>';
+                envBadge.innerHTML = '<span class="badge bg-success">Set</span>';
+            } else {
+                statusBadge.innerHTML = '<span class="badge bg-danger">Not Connected</span>';
+                envBadge.innerHTML = '<span class="badge bg-danger">Missing</span>';
+            }
+            
+        } catch (error) {
+            console.warn('Could not check GSC status:', error);
+            document.getElementById('gsc-status').innerHTML = '<span class="badge bg-secondary">Unknown</span>';
+            document.getElementById('gsc-env-status').innerHTML = '<span class="badge bg-secondary">Unknown</span>';
+        }
+    }
+    
+    // Check status when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        // For now, assume GSC is not configured since we don't have the API endpoint
+        document.getElementById('gsc-status').innerHTML = '<span class="badge bg-warning">Check Environment Variables</span>';
+        document.getElementById('gsc-env-status').innerHTML = '<span class="badge bg-warning">Not Checked</span>';
+    });
+    
+    // Form validation
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const siteUrl = document.getElementById('site_url').value;
+        const gscUrl = document.getElementById('gsc_property_url').value;
+        
+        if (!siteUrl || !gscUrl) {
+            e.preventDefault();
+            showToast('Site URL and GSC Property URL are required', 'error');
+            return false;
+        }
+        
+        // Basic URL validation
+        try {
+            new URL(siteUrl);
+            new URL(gscUrl);
+        } catch (error) {
+            e.preventDefault();
+            showToast('Please enter valid URLs', 'error');
+            return false;
+        }
+        
+        showToast('Saving settings...', 'info');
+    });
+</script>
+{% endblock %}
