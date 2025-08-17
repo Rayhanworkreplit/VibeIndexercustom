@@ -114,19 +114,19 @@
                         </form>
                     </div>
                     <div class="col-md-2">
-                        <button type="button" class="btn btn-info w-100" onclick="harvestGSCFeedback()">
+                        <button type="button" class="btn btn-info w-100" id="harvestGSCBtn">
                             <i class="fas fa-download me-1"></i>
                             Harvest GSC
                         </button>
                     </div>
                     <div class="col-md-2">
-                        <button type="button" class="btn btn-warning w-100" onclick="startAdvancedIndexing()">
+                        <button type="button" class="btn btn-warning w-100" id="startAdvancedIndexingBtn">
                             <i class="fas fa-rocket me-1"></i>
                             6-Layer Campaign
                         </button>
                     </div>
                     <div class="col-md-2">
-                        <button type="button" class="btn btn-secondary w-100" onclick="processBackgroundTasks()">
+                        <button type="button" class="btn btn-secondary w-100" id="processTasksBtn">
                             <i class="fas fa-cogs me-1"></i>
                             Process Tasks
                         </button>
@@ -279,84 +279,117 @@
 
 {% block scripts %}
 <script>
-    // Prepare data for charts
-    const dailyStats = {{ daily_stats|tojson|safe }};
+    // Prepare data for charts - ensure variables exist
+    const dailyStats = {{ daily_stats|tojson|safe }} || [];
+    const statsData = {
+        indexed_urls: {{ stats.indexed_urls|default(0) }},
+        ready_urls: {{ stats.ready_urls|default(0) }},
+        pending_urls: {{ stats.pending_urls|default(0) }},
+        error_urls: {{ stats.error_urls|default(0) }}
+    };
     
     // Status distribution chart
-    const statusCtx = document.getElementById('statusChart').getContext('2d');
-    new Chart(statusCtx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Indexed', 'Ready', 'Pending', 'Error'],
-            datasets: [{
-                data: [
-                    {{ stats.indexed_urls }},
-                    {{ stats.ready_urls }},
-                    {{ stats.pending_urls }},
-                    {{ stats.error_urls }}
-                ],
-                backgroundColor: [
-                    'var(--bs-success)',
-                    'var(--bs-info)',
-                    'var(--bs-warning)',
-                    'var(--bs-danger)'
-                ]
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
+    const statusCtx = document.getElementById('statusChart');
+    if (statusCtx) {
+        new Chart(statusCtx.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Indexed', 'Ready', 'Pending', 'Error'],
+                datasets: [{
+                    data: [
+                        statsData.indexed_urls,
+                        statsData.ready_urls,
+                        statsData.pending_urls,
+                        statsData.error_urls
+                    ],
+                    backgroundColor: [
+                        'var(--bs-success)',
+                        'var(--bs-info)',
+                        'var(--bs-warning)',
+                        'var(--bs-danger)'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
                 }
             }
-        }
-    });
+        });
+    }
     
     // Daily trends chart
-    const indexingCtx = document.getElementById('indexingChart').getContext('2d');
-    const dates = dailyStats.map(stat => stat.date);
-    const totalUrls = dailyStats.map(stat => stat.total_urls || 0);
-    const indexedUrls = dailyStats.map(stat => stat.indexed_urls || 0);
-    
-    new Chart(indexingCtx, {
-        type: 'line',
-        data: {
-            labels: dates,
-            datasets: [{
-                label: 'Total URLs',
-                data: totalUrls,
-                borderColor: 'var(--bs-primary)',
-                backgroundColor: 'transparent',
-                tension: 0.4
-            }, {
-                label: 'Indexed URLs',
-                data: indexedUrls,
-                borderColor: 'var(--bs-success)',
-                backgroundColor: 'transparent',
-                tension: 0.4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top'
-                }
+    const indexingCtx = document.getElementById('indexingChart');
+    if (indexingCtx && dailyStats && dailyStats.length > 0) {
+        const dates = dailyStats.map(stat => stat.date || '');
+        const totalUrls = dailyStats.map(stat => stat.total_urls || 0);
+        const indexedUrls = dailyStats.map(stat => stat.indexed_urls || 0);
+        
+        new Chart(indexingCtx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'Total URLs',
+                    data: totalUrls,
+                    borderColor: 'var(--bs-primary)',
+                    backgroundColor: 'transparent',
+                    tension: 0.4
+                }, {
+                    label: 'Indexed URLs',
+                    data: indexedUrls,
+                    borderColor: 'var(--bs-success)',
+                    backgroundColor: 'transparent',
+                    tension: 0.4
+                }]
             },
-            scales: {
-                y: {
-                    beginAtZero: true
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
                 }
             }
+        });
+    }
+    
+    // Set up dashboard event listeners
+    document.addEventListener('DOMContentLoaded', function() {
+        // Harvest GSC button
+        const harvestBtn = document.getElementById('harvestGSCBtn');
+        if (harvestBtn) {
+            harvestBtn.addEventListener('click', harvestGSCFeedback);
+        }
+        
+        // Advanced indexing button
+        const advancedBtn = document.getElementById('startAdvancedIndexingBtn');
+        if (advancedBtn) {
+            advancedBtn.addEventListener('click', startAdvancedIndexing);
+        }
+        
+        // Process tasks button
+        const processBtn = document.getElementById('processTasksBtn');
+        if (processBtn) {
+            processBtn.addEventListener('click', processBackgroundTasks);
         }
     });
     
     // Harvest GSC feedback function
     async function harvestGSCFeedback() {
-        const button = document.querySelector('button[onclick="harvestGSCFeedback()"]');
+        const button = document.getElementById('harvestGSCBtn');
+        if (!button) return;
+        
         const originalText = button.innerHTML;
         
         button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Harvesting...';
@@ -371,12 +404,56 @@
             });
             
             if (response.ok) {
-                showToast('GSC feedback harvest queued', 'success');
+                if (typeof showToast === 'function') {
+                    showToast('GSC feedback harvest queued', 'success');
+                }
             } else {
-                showToast('Error queuing GSC harvest', 'error');
+                if (typeof showToast === 'function') {
+                    showToast('Error queuing GSC harvest', 'error');
+                }
             }
         } catch (error) {
-            showToast('Error queuing GSC harvest', 'error');
+            console.error('Error queuing GSC harvest:', error);
+            if (typeof showToast === 'function') {
+                showToast('Error queuing GSC harvest', 'error');
+            }
+        } finally {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
+    }
+    
+    async function startAdvancedIndexing() {
+        const button = document.getElementById('startAdvancedIndexingBtn');
+        if (!button) return;
+        
+        const originalText = button.innerHTML;
+        
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Starting Campaign...';
+        button.disabled = true;
+        
+        try {
+            const response = await fetch('/api/advanced-indexing', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (typeof showToast === 'function') {
+                    showToast('Advanced indexing campaign started', 'success');
+                }
+            } else {
+                if (typeof showToast === 'function') {
+                    showToast('Error starting advanced indexing', 'error');
+                }
+            }
+        } catch (error) {
+            console.error('Error starting advanced indexing:', error);
+            if (typeof showToast === 'function') {
+                showToast('Error starting advanced indexing', 'error');
+            }
         } finally {
             button.innerHTML = originalText;
             button.disabled = false;
@@ -391,7 +468,7 @@
             
             // Update stat cards
             const cards = document.querySelectorAll('.card-body h3');
-            if (cards.length >= 5) {
+            if (cards.length >= 6) {
                 cards[0].textContent = data.total_urls;
                 cards[1].textContent = data.indexed_urls;
                 cards[2].textContent = data.ready_urls;

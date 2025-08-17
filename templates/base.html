@@ -53,7 +53,7 @@
                 </ul>
                 
                 <div class="navbar-nav">
-                    <button class="btn btn-outline-primary btn-sm" onclick="processBackgroundTasks()">
+                    <button class="btn btn-outline-primary btn-sm" id="processTasksNavBtn">
                         <i class="fas fa-sync-alt me-1"></i>
                         Process Tasks
                     </button>
@@ -106,9 +106,20 @@
     
     <!-- Global JavaScript Functions -->
     <script>
+        // Set up event listeners when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Setup nav process tasks button
+            const navBtn = document.getElementById('processTasksNavBtn');
+            if (navBtn) {
+                navBtn.addEventListener('click', processBackgroundTasks);
+            }
+        });
+        
         // Process background tasks
         async function processBackgroundTasks() {
-            const button = document.querySelector('button[onclick="processBackgroundTasks()"]');
+            const button = document.getElementById('processTasksNavBtn') || document.querySelector('button[onclick="processBackgroundTasks()"]');
+            if (!button) return;
+            
             const originalText = button.innerHTML;
             
             button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processing...';

@@ -289,8 +289,11 @@ def api_stats():
     }
     
     # Calculate indexing rate
-    rate = (stats['indexed_urls'] / stats['total_urls'] * 100) if stats['total_urls'] > 0 else 0
-    stats['indexing_rate'] = round(rate, 1)
+    if stats['total_urls'] > 0:
+        rate = (stats['indexed_urls'] / stats['total_urls'] * 100)
+        stats['indexing_rate'] = round(rate, 1)
+    else:
+        stats['indexing_rate'] = 0.0
     
     return jsonify(stats)
 
