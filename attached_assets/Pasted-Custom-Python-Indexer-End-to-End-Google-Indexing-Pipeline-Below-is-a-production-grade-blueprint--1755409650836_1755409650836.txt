@@ -1,0 +1,138 @@
+Custom Python Indexer — End-to-End Google Indexing Pipeline
+Below is a production-grade blueprint (code + flow) that automates everything Google needs to reliably discover, crawl, and index every eligible URL on your site—without violating any Search Central policies.
+
+Flowchart of Python-based Custom Google Indexer System
+1. High-Level Architecture
+Inventory DB (SQLite)
+Stores every canonical URL, its index status, last crawl, and any errors.
+
+Validation Workers
+1 URL → runs eight checks in parallel:
+
+robots.txt allow?
+
+HTTP 2xx?
+
+no noindex?
+
+self-canonical?
+
+Core Web Vitals proxy ok?
+
+structured data valid?
+
+page depth ≤3 clicks?
+
+unique content hash?
+
+Sitemap Writer
+Generates paginated XML sitemaps plus <sitemapindex> and auto-submits them through the Search Console API.
+
+Internal-Link Optimizer
+If depth>3, it injects contextual links on hub pages and logs a task for CMS update.
+
+Indexing API Client (optional)
+Fires only for JobPosting or BroadcastEvent URLs.
+
+GSC Feedback Harvester
+Pulls Page Indexing & URL-Inspection data nightly; flags “Discovered – not indexed”, “Alternate canonical”, etc.
+
+Dashboard & Alerts
+Real-time stats, top exclusion reasons, and Slack/Email alerts for newly de-indexed pages.
+
+2. Core Code Modules
+python
+# db.py ─ schema + helper
+class DB:
+    def __init__(self, path="indexer.db"):
+        self.conn = sqlite3.connect(path, isolation_level=None)
+        self.conn.execute("""PRAGMA foreign_keys=ON""")
+        self.conn.executescript("""
+        CREATE TABLE IF NOT EXISTS urls(
+            id INTEGER PRIMARY KEY, url TEXT UNIQUE,
+            status TEXT DEFAULT 'pending',
+            last_checked TEXT, last_error TEXT
+        );
+        CREATE TABLE IF NOT EXISTS crawls(
+            id INTEGER PRIMARY KEY, url_id INTEGER,
+            code INTEGER, hash TEXT, checked TEXT,
+            FOREIGN KEY(url_id) REFERENCES urls(id)
+        );
+        """)
+    def add(self, url):  # idempotent
+        self.conn.execute("INSERT OR IGNORE INTO urls(url) VALUES(?)", (url,))
+python
+# validate.py ─ all technical/SEO checks
+def validate(url) -> dict:
+    r = httpx.get(url, timeout=10, follow_redirects=True)
+    soup = BeautifulSoup(r.text, "lxml")
+    allow = robots_allowed("Googlebot", url)
+    issues = []
+    if not allow:             issues.append("Blocked by robots.txt")
+    if r.status_code != 200:  issues.append(f"HTTP {r.status_code}")
+    if soup.find("meta",{"name":"robots","content":re.compile("noindex")}):
+        issues.append("Meta noindex")
+    canon = soup.find("link", rel="canonical")
+    if canon and canon["href"].rstrip("/") != url.rstrip("/"):
+        issues.append("Bad canonical")
+    # extra checks omitted for brevity…
+    return {"ok": not issues, "issues": issues, "hash": hashlib.md5(r.text.encode()).hexdigest()}
+python
+# sitemap_writer.py
+def write_sitemaps(batch: list[str], out_dir="sitemaps/"):
+    root = ET.Element("urlset", xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
+    for u in batch:
+        n = ET.SubElement(root, "url")
+        ET.SubElement(n, "loc").text = u
+        ET.SubElement(n, "lastmod").text = datetime.utcnow().date().isoformat()
+    fname = f"{out_dir}sitemap-{uuid4().hex}.xml"
+    ET.ElementTree(root).write(fname, encoding="utf-8", xml_declaration=True)
+    return fname
+python
+# gsc.py ─ Search Console API wrapper
+def submit_sitemap(path):
+    creds = service_account.Credentials.from_service_account_file("sa.json", scopes=["https://www.googleapis.com/auth/webmasters"])
+    webmasters = build('searchconsole','v1', credentials=creds)
+    site = "https://example.com"
+    webmasters.sitemaps().submit(siteUrl=site, feedpath=path).execute()
+Task Orchestrator (CLI)
+python
+@cli.command()
+def run():
+    # 1. discover new URLs (CMS, RPC, RSS)
+    new_urls = discover()
+    db.add_many(new_urls)
+
+    # 2. validate pending URLs
+    for row in db.fetch(status='pending', limit=500):
+        report = validate(row['url'])
+        db.update(row['url'], 'ready' if report['ok'] else 'error', "; ".join(report['issues']))
+        db.log_crawl(row['url'], report)
+
+    # 3. write + submit sitemaps for 'ready' URLs not yet in XML
+    batch = db.ready_needing_sitemap()
+    if batch: submit_sitemap(write_sitemaps(batch))
+
+    # 4. harvest GSC feedback, flip status ➜ ‘indexed’ when confirmed
+    harvest_gsc()
+3. Deployment & Ops
+Scheduler: Run python indexer.py run every hour via cron/K8s CronJob.
+
+Secrets: GSC service-account JSON mounted as secret; HTTP client rotates through static outbound IPs with proper User-Agent.
+
+Observability: Push Prometheus metrics (indexed_total, errors_total, avg_latency) and Grafana dashboards.
+
+CI/CD: Unit tests for URL parsing, robots logic, XML generation; run Black, Ruff, MyPy.
+
+4. Achieving “100% Indexing”
+Inventory completeness → every canonical URL enters the DB.
+
+Eligibility gate → pages failing technical/quality checks never reach sitemap, forcing fixes first.
+
+Fast discovery → fresh XML sitemaps + internal links + RSS ping.
+
+Policy-safe push → Indexing API only for JobPosting/BroadcastEvent.
+
+Continuous feedback → nightly GSC harvest closes the loop; de-indexed pages go back to “pending-fix”.
+
+Following this pipeline, any URL that passes validation is surfaced to Google quickly and remains indexed as long as its quality stays high. The attached code files (db.py, validate.py, sitemap_writer.py, gsc.py) and the SQLite schema in google_indexer.db give you a runnable foundation you can extend to your stack.
