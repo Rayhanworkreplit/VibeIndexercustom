@@ -597,7 +597,7 @@ def analyze_content():
         if not url:
             return jsonify({'error': 'URL is required'}), 400
         
-        # Use the web scraper to get content
+        # Use the web content extraction function
         from services.url_discovery import get_website_text_content
         content = get_website_text_content(url)
         

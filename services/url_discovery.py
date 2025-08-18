@@ -275,6 +275,45 @@ class URLDiscovery:
         if hasattr(self, 'client'):
             self.client.close()
 
+def get_website_text_content(url: str) -> str:
+    """
+    Extract text content from a website URL
+    
+    Args:
+        url: The URL to extract content from
+        
+    Returns:
+        Clean text content from the webpage
+    """
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+        
+        response = requests.get(url, timeout=10, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        })
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Remove script and style elements
+        for script in soup(["script", "style"]):
+            script.decompose()
+        
+        # Get text content
+        content = soup.get_text()
+        
+        # Clean up whitespace
+        lines = (line.strip() for line in content.splitlines())
+        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+        content = '\n'.join(chunk for chunk in chunks if chunk)
+        
+        return content
+        
+    except Exception as e:
+        logger.error(f"Error extracting content from {url}: {str(e)}")
+        return ""
+
 def discover_urls(source_type: str, source_url: str = None, **kwargs) -> List[str]:
     """
     Discover URLs from various sources
