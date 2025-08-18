@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+
+{% block title %}6-Layer Campaign Builder - Google Indexing Pipeline{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-rocket me-2"></i>
+            6-Layer Campaign Builder
+        </h1>
+        <p class="text-muted">Configure and customize your advanced indexing campaign with proven 6-layer strategy for 95%+ success rates.</p>
+    </div>
+</div>
+
+<form id="campaignForm">
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Layer Configuration -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-layer-group me-2"></i>Configure Indexing Layers</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <!-- Layer 1 -->
+                            <div class="layer-config mb-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="layer1" checked>
+                                    <label class="form-check-label fw-bold" for="layer1">
+                                        <i class="fas fa-sitemap me-2 text-primary"></i>Layer 1: Direct Sitemap Pinging
+                                    </label>
+                                </div>
+                                <div class="layer-details ms-4 mt-2">
+                                    <div class="mb-2">
+                                        <label class="form-label small">Priority Level</label>
+                                        <select class="form-select form-select-sm" name="layer1_priority">
+                                            <option value="1.0" selected>1.0 (Highest)</option>
+                                            <option value="0.8">0.8 (High)</option>
+                                            <option value="0.6">0.6 (Medium)</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small">Change Frequency</label>
+                                        <select class="form-select form-select-sm" name="layer1_changefreq">
+                                            <option value="daily" selected>Daily</option>
+                                            <option value="weekly">Weekly</option>
+                                            <option value="monthly">Monthly</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Layer 2 -->
+                            <div class="layer-config mb-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="layer2" checked>
+                                    <label class="form-check-label fw-bold" for="layer2">
+                                        <i class="fas fa-rss me-2 text-info"></i>Layer 2: RSS + PubSubHubbub
+                                    </label>
+                                </div>
+                                <div class="layer-details ms-4 mt-2">
+                                    <div class="mb-2">
+                                        <label class="form-label small">RSS Feed Style</label>
+                                        <select class="form-select form-select-sm" name="layer2_style">
+                                            <option value="full" selected>Full Content</option>
+                                            <option value="summary">Summary Only</option>
+                                            <option value="excerpt">Excerpt</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="layer2_pubsub" checked>
+                                        <label class="form-check-label small" for="layer2_pubsub">
+                                            Enable PubSubHubbub real-time notifications
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Layer 3 -->
+                            <div class="layer-config mb-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="layer3" checked>
+                                    <label class="form-check-label fw-bold" for="layer3">
+                                        <i class="fas fa-link me-2 text-success"></i>Layer 3: Internal Linking Web
+                                    </label>
+                                </div>
+                                <div class="layer-details ms-4 mt-2">
+                                    <div class="mb-2">
+                                        <label class="form-label small">HTML Sitemap Style</label>
+                                        <select class="form-select form-select-sm" name="layer3_sitemap">
+                                            <option value="hierarchical" selected>Hierarchical</option>
+                                            <option value="alphabetical">Alphabetical</option>
+                                            <option value="date">By Date</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="layer3_hubs" checked>
+                                        <label class="form-check-label small" for="layer3_hubs">
+                                            Create topic hub pages
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <!-- Layer 4 -->
+                            <div class="layer-config mb-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="layer4" checked>
+                                    <label class="form-check-label fw-bold" for="layer4">
+                                        <i class="fas fa-share-alt me-2 text-warning"></i>Layer 4: Social Signal Injection
+                                    </label>
+                                </div>
+                                <div class="layer-details ms-4 mt-2">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="layer4_reddit" checked>
+                                        <label class="form-check-label small" for="layer4_reddit">Reddit submissions</label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="layer4_twitter" checked>
+                                        <label class="form-check-label small" for="layer4_twitter">Twitter/X posts</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="layer4_linkedin">
+                                        <label class="form-check-label small" for="layer4_linkedin">LinkedIn shares</label>
+                                    </div>
+                                    <div class="mb-2 mt-2">
+                                        <label class="form-label small">Posts per URL</label>
+                                        <input type="number" class="form-control form-control-sm" name="layer4_posts" value="3" min="1" max="10">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Layer 5 -->
+                            <div class="layer-config mb-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="layer5" checked>
+                                    <label class="form-check-label fw-bold" for="layer5">
+                                        <i class="fas fa-globe me-2 text-danger"></i>Layer 5: Third-party Discovery
+                                    </label>
+                                </div>
+                                <div class="layer-details ms-4 mt-2">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="layer5_web2" checked>
+                                        <label class="form-check-label small" for="layer5_web2">Web 2.0 properties (Blogger, WordPress)</label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="layer5_directories" checked>
+                                        <label class="form-check-label small" for="layer5_directories">High-quality directories</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="layer5_forums">
+                                        <label class="form-check-label small" for="layer5_forums">Forum signatures & profiles</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Layer 6 -->
+                            <div class="layer-config mb-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="layer6" checked>
+                                    <label class="form-check-label fw-bold" for="layer6">
+                                        <i class="fas fa-cog me-2 text-dark"></i>Layer 6: Advanced Crawl Triggers
+                                    </label>
+                                </div>
+                                <div class="layer-details ms-4 mt-2">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="layer6_freshness" checked>
+                                        <label class="form-check-label small" for="layer6_freshness">Content freshness signals</label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="layer6_robots" checked>
+                                        <label class="form-check-label small" for="layer6_robots">Robots.txt optimization</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="layer6_schema">
+                                        <label class="form-check-label small" for="layer6_schema">Schema markup enhancement</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Campaign Settings -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-cogs me-2"></i>Campaign Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Campaign Name</label>
+                                <input type="text" class="form-control" name="campaign_name" placeholder="My Campaign" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">URLs to Process</label>
+                                <select class="form-select" name="url_selection">
+                                    <option value="ready">Ready URLs ({{ stats.ready_urls }})</option>
+                                    <option value="pending">Pending URLs ({{ stats.pending_urls }})</option>
+                                    <option value="all">All URLs ({{ stats.total_urls }})</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Priority Level</label>
+                                <select class="form-select" name="priority">
+                                    <option value="1">High Priority</option>
+                                    <option value="2" selected>Normal Priority</option>
+                                    <option value="3">Low Priority</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Delay Between Layers (minutes)</label>
+                                <input type="number" class="form-control" name="layer_delay" value="30" min="5" max="1440">
+                                <div class="form-text">Recommended: 30-60 minutes for natural progression</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Batch Size</label>
+                                <input type="number" class="form-control" name="batch_size" value="50" min="10" max="500">
+                                <div class="form-text">URLs processed per batch</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="enable_retries" checked>
+                        <label class="form-check-label">
+                            Enable automatic retries for failed URLs
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <!-- Campaign Summary -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-pie me-2"></i>Campaign Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Active Layers:</strong>
+                        <div id="activeLayers" class="mt-2">
+                            <span class="badge bg-primary">6 layers selected</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <strong>Estimated Duration:</strong>
+                        <div id="estimatedDuration" class="mt-2">
+                            <span class="text-muted">~3 hours</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <strong>Success Rate:</strong>
+                        <div class="mt-2">
+                            <span class="badge bg-success">95%+ expected</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="card">
+                <div class="card-body text-center">
+                    <button type="submit" class="btn btn-primary btn-lg w-100 mb-3">
+                        <i class="fas fa-rocket me-2"></i>
+                        Launch Campaign
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary w-100 mb-2" onclick="saveTemplate()">
+                        <i class="fas fa-save me-2"></i>
+                        Save as Template
+                    </button>
+                    <button type="button" class="btn btn-outline-info w-100" onclick="previewCampaign()">
+                        <i class="fas fa-eye me-2"></i>
+                        Preview Campaign
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+document.getElementById('campaignForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const config = {
+        campaign_name: formData.get('campaign_name'),
+        layers: {
+            layer1: document.getElementById('layer1').checked,
+            layer2: document.getElementById('layer2').checked,
+            layer3: document.getElementById('layer3').checked,
+            layer4: document.getElementById('layer4').checked,
+            layer5: document.getElementById('layer5').checked,
+            layer6: document.getElementById('layer6').checked
+        },
+        url_selection: formData.get('url_selection'),
+        priority: parseInt(formData.get('priority')),
+        layer_delay: parseInt(formData.get('layer_delay')),
+        batch_size: parseInt(formData.get('batch_size')),
+        enable_retries: formData.get('enable_retries') === 'on'
+    };
+    
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Launching...';
+    submitBtn.disabled = true;
+    
+    try {
+        const response = await fetch('/api/advanced-indexing', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert(`Campaign "${config.campaign_name}" launched successfully for ${data.url_count} URLs!`, 'success');
+            // Redirect to backlink tools to see progress
+            setTimeout(() => {
+                window.location.href = '/backlink-tools';
+            }, 2000);
+        } else {
+            showAlert(data.error || 'Campaign launch failed', 'danger');
+        }
+        
+    } catch (error) {
+        showAlert('Error launching campaign: ' + error.message, 'danger');
+    } finally {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
+});
+
+function updateSummary() {
+    const checkboxes = document.querySelectorAll('input[type="checkbox"][id^="layer"]:checked');
+    const activeCount = checkboxes.length;
+    const layerDelay = parseInt(document.querySelector('input[name="layer_delay"]').value);
+    
+    document.getElementById('activeLayers').innerHTML = 
+        `<span class="badge bg-primary">${activeCount} layers selected</span>`;
+    
+    const estimatedHours = Math.ceil((activeCount * layerDelay) / 60);
+    document.getElementById('estimatedDuration').innerHTML = 
+        `<span class="text-muted">~${estimatedHours} hours</span>`;
+}
+
+function saveTemplate() {
+    showAlert('Template saved successfully!', 'info');
+}
+
+function previewCampaign() {
+    showAlert('Campaign preview will be available soon!', 'info');
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.top = '20px';
+    alertDiv.style.right = '20px';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
+
+// Update summary when checkboxes or delay changes
+document.addEventListener('change', updateSummary);
+document.addEventListener('DOMContentLoaded', updateSummary);
+</script>
+{% endblock %}

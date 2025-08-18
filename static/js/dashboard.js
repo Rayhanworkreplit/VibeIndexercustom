@@ -646,6 +646,9 @@ function showAdvancedIndexingModal() {
     bootstrapModal.show();
 }
 
+// Make this function globally available
+window.showAdvancedIndexingModal = showAdvancedIndexingModal;
+
 /**
  * Create Advanced Indexing Configuration Modal
  */
